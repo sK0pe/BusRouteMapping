@@ -18,6 +18,7 @@ static bool valid_location(double latitude, double longitude){
 			(longitude >= -180.0 && longitude <= 180.0));
 }
 
+
 /*
  *	degrees_to_radians
  *	double
@@ -109,10 +110,13 @@ int main(int argc, char *argv[]){
 		exit(EXIT_FAILURE);
 	}
 	else{
-		origin_Lat = atof(argv[2]);
-		origin_Lon = atof(argv[3]);
-		dest_Lat = atof(argv[4]);
-		dest_Lon = atof(argv[5]);
+		// Using local variables but could place these directly into 
+		// valid_location checks
+		// Also may want to change to scanf instead of atof
+		double origin_Lat = atof(argv[2]);
+		double origin_Lon = atof(argv[3]);
+		double dest_Lat = atof(argv[4]);
+		double dest_Lon = atof(argv[5]);
 		//	Check if Origin coordinates correct
 		if (!valid_location(origin_Lat,origin_Lon)){
 			fprintf(stderr,"%s Error: Origin Coordinates invalid!\n", argv[0]);
@@ -123,6 +127,11 @@ int main(int argc, char *argv[]){
 			fprintf(stderr,"%s Error: Destination Coordinates invalid!\n", argv[0]);
 			exit(EXIT_FAILURE);
 		}
+		
+		//	Do we need to open all the files all at once, or as we go?
+		//	Depends on algorithm and data structure used.
+		//	openFiles(argv[1]);
+		
 		//	Begin Journey	
 		origin_to_stop(origin_Lat, origin_Lon, dest_Lat, dest_Lon);
 	}
