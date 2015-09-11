@@ -1,18 +1,12 @@
-<<<<<<< HEAD
-
-<<<<<<< HEAD
-=======
-#define  N_COLS              400
-#define  N_FIELDS            15
-=======
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <math.h>
+#include <time.h>
 
->>>>>>> mainArgCheck
-#define  MAX_WALKING_DIST    1000
-#define  EARTH_RADIUS_M      6372797
+#define	MAX_WALKING_DIST 1000
+#define EARTH_RADIUS_M 6372797
+#define PI (acos(-1.0))
 
 /*
  *	valid_location
@@ -61,15 +55,49 @@ static double haversine(double lat1, double lon1, double lat2, double lon2){
 }
 
 /*
+ * getTime
+ * int
+ * returns int representing minute of day based on system time
+ */
+int getTime(){
+	char hour[3], min[3];
+	time_t currentTime;
+	//	call current time in seconds from local system
+	time(&currentTime);
+	//	format to a tm struct details for local system
+	struct tm *detail = localtime(&currentTime);
+	//	extract hour and minute in string form
+	//	could also have extracted date and day 
+	strftime(hour, 3, "%H", detail);
+	strftime(min, 3, "%M", detail);
+	//	convert to int 
+	int h = atoi(hour);
+	int m = atoi(min);
+	
+	return h*60 + m;
+}
+
+/*
  *	walk
  *	void
  *	Print function for walking
  *
  */
-static void walk(int minutes, int distance, char[] destination){
-	printf("%i:%i walk %im to %s", time/60, time%60, distance, destination);
+static void walk(int minutes, int distance, char destination[]){
+	printf("%i:%i walk %im to %s", minutes/60, minutes%60, distance, destination);
 }
 
+/*
+ * 	stop_to_destination
+ */
+void stop_to_destination(int minutes, double final_Walk){
+	int distance = (int) ceil(final_Walk);
+	//	print walk line
+	walk(minutes, distance, "destination");
+	//	print arrive line
+	minutes += distance;
+	printf("%i:%i arrive", minutes/60, minutes%60);
+}
 
 /*
  *	origin_to_stop
@@ -88,17 +116,6 @@ static void origin_to_stop(double lat1, double lon1, double lat2, double lon2){
  *	stop_to_stop
  */
 
-/*
- * 	stop_to_destination
- */
-void stop_to_destination(int minutes, double final_Walk){
-	int distance = (int) ceil(final_Walk);
-	//	print walk line
-	walk(minutes, distance, "destination");
-	//	print arrive line
-	minutes += distance;
-	printf("%i:%i arrive", minutes/60, minutes%60);
-}
 
 /*
  */
@@ -136,13 +153,19 @@ int main(int argc, char *argv[]){
 			exit(EXIT_FAILURE);
 		}
 		
+		//	Get Current time
+		//	Addressing time in minutes allows for easy interpretation as a cost
+		int minute_of_day = getTime();
+
 		//	Do we need to open all the files all at once, or as we go?
 		//	Depends on algorithm and data structure used.
 		//	openFiles(argv[1]);
 		
-		//	Begin Journey	
+
+
+
+		//	Find optimal closest stop?	
 		origin_to_stop(origin_Lat, origin_Lon, dest_Lat, dest_Lon);
 	}
 	return 0;
 }
->>>>>>> mainArgCheck
