@@ -11,10 +11,11 @@
 //	Filenames
 #define ROUTES		"/routes.txt"
 #define STOPS			"/stops.txt"
-#define TRIPS			"/trips.txt"
 #define STOPTIMES	"/stop_times.txt"
 //	Global Variables
 int DAY;
+int TIME;
+char* FOLDER;
 
 //	Struct Definitions
 
@@ -24,17 +25,36 @@ int DAY;
  */
 typedef struct{
 	int id;
-	char[4] routeNumber;
-	char[50] routeName;
+	char routeNumber[4];
+	char routeName[50];
 	int type;
 } Route;
 
+
 /*
- *	
+ * Stop struct
+ * Holds pertinent data for Stop information
  */
 typedef struct{
+	int location_type;
+	int parent_station;
 	int id;
-} Trip;
+	int name[100];
+	int latitude;
+	int longitude;
+	StopTimes *available;
+} Stop;
+
+/*
+ *	Stop Times struct
+ *	Holds pertinent data for Stop times
+ */
+typedef struct{
+	int trip_id;
+	int departs;
+	int stop_id;
+	int stop_sequence;
+}StopTimes;
 
 
 
@@ -85,7 +105,8 @@ static double haversine(double lat1, double lon1, double lat2, double lon2){
 }
 
 
-/*
+/* 
+ * <unused due to context of project>
  * getTime
  * int
  * returns int representing minute of day based on system time
@@ -113,7 +134,6 @@ int getTime(){
 	else if(strcmp(day,"Sun")==0) DAY = 7;
 	else printf("getTime : Invalid day sourced from System");
 	
-
 	//	convert time to int 
 	int h = atoi(hour);
 	int m = atoi(min);	
@@ -158,77 +178,102 @@ char *tokenizer(char *source, const char *delimiter){
 	return tokenStart;
 }
  
-/*
- *	getRouteName
- *	char*
- *	Takes integer representation of route name as input
- *	returns char* with route name,
- *	if no route name returns "bus"
- */
-char *getRouteName(int route){
-	FILE *routeData = fopen(ROUTES, "r");
-	char line[BUFSIZ];
-	char routeName[50];
-	char id[4];
-	bool first = true;
 
+
+/*
+ *	getNumberOfLines()
+ *	int
+ *	Counts newlines in a file
+ */
+int getNumberOfLines(FILE * stream){
+	int character;
+	int lineCount;
+
+	while((character = fgetc(stream)) != EOF){
+		if( character == '\n'){
+			lineCount++;
+		}
+	}
+	return lineCount;
+}
+
+/*
+ *	loadFile()
+ *	File *
+ *	Takes NULL FILE * and char *
+ *	To make a generic file loader with included error check
+ */
+FILE* loadFile(FILE *stream, char*fileToLoad){
+	char path[200];
+	strcpy(path, FOLDER);
+	strcat(path, fileToLoad);
+	printf("%s\n", path);
+	stream = fopen(path, "r");
+	if(stream == NULL){
+		printf("Cannot open path: %s\n", path);
+		exit(EXIT_FAILURE);
+	}
+	return stream;
+}
+
+
+/*
+ *	loadStops()
+ *
+ */
+void loadStops(){
+	FILE* stopData = NULL;
+	stopData = loadFile(stopData, STOPS);
+	bool first = true;
+	char line[BUFSIZ];
+	while(fgets(line, sizeof line, stopData) != NULL){
+		if(first){
+			first = false;
+			continue;
+		}
+	}	
+}
+
+/*
+ *	loadStopTimes()
+ *
+ */
+void loadStopTimes(){
+	FILE* stopTimeData = NULL;
+	stopTimeData = loadFile(stopTimeData, STOPTIMES);
+	bool first = true;
+	char line[BUFSIZ];
+	while(fgets(line, sizeof line, stopTimeData) != NULL){
+		if(first){
+			first = false;
+			continue;
+		}
+	}	
+}
+
+/*
+ *	loadRoutes()
+ *
+ */
+void loadRoutes(){
+	FILE* routeData = NULL;
+	routeData = loadFile(routeData, ROUTES);
+	bool first = true;
+	char line[BUFSIZ];
 	while(fgets(line, sizeof line, routeData) != NULL){
 		if(first){
 			first = false;
 			continue;
 		}
-		sscanf( line, "%[^','],%*[^','],%*[^','],%[^','],%*[^','],%*[^','],%*[^','],%*[^','],%*s", id, routeNumber,routeName);
-		if(route == atoi(id)){
-			break;
-		}
-	}
-	if(strcmp(routeName, "")==0) return "bus";
-	return routeName;
-}
-
-/*
- *	walk
- *	void
- *	Print function for walking
- *
- */
-static void walk(int minutes, int distance, char destination[]){
-	printf("%i:%i walk %im to %s", minutes/60, minutes%60, distance, destination);
-}
-
-/*
- * 	stop_to_destination
- */
-void stop_to_destination(int minutes, double final_Walk){
-	int distance = (int) ceil(final_Walk);
-	//	print walk line
-	walk(minutes, distance, "destination");
-	//	print arrive line
-	minutes += distance;
-	printf("%i:%i arrive", minutes/60, minutes%60);
-}
-
-/*
- *	origin_to_stop
- *	Determine distance to destination and finds optimal public transport
- *	stop to walk to (if available).
- *	
- */
-static void origin_to_stop(double lat1, double lon1, double lat2, double lon2){
-	double distance = haversine(lat1, lon1, lat2, lon2);
-	if(distance < MAX_WALKING_DIST){
-		stop_to_destination(0, distance);
 	}
 }
 
 /*
- *	stop_to_stop
+ * 	find_route()
  */
-
-
-/*
- */
-
+void find_route(double origin_Lat, double origin_Lon, double dest_Lat, double dest_Lon, int time){
+	loadStops();
+}
 
 
 /*
@@ -238,9 +283,9 @@ static void origin_to_stop(double lat1, double lon1, double lat2, double lon2){
 int main(int argc, char *argv[]){
 
 	if (argc != 6){
-		fprintf(stderr,"%s Usage: <directory>\n <Origin Latitude> <Origin Longitude>\n \
-							<Destination Latitude> <Destination Longitude>\n Coordinates \
-							must be entered as positive or negative numbers.\n",argv[0]);
+		fprintf(stderr,"%s Usage: <directory>\n <Origin Latitude> <Origin Longitude>\n\
+				<Destination Latitude> <Destination Longitude>\n Coordinates \
+				must be entered as positive or negative numbers.\n",argv[0]);
 		exit(EXIT_FAILURE);
 	}
 	else{
@@ -261,20 +306,13 @@ int main(int argc, char *argv[]){
 			fprintf(stderr,"%s Error: Destination Coordinates invalid!\n", argv[0]);
 			exit(EXIT_FAILURE);
 		}
-		
+		//	Define global variable for FOLDER
+		FOLDER = argv[1];
 		//	Get Current time
 		//	Addressing time in minutes allows for easy interpretation as a cost
-		int minute_of_day = getTime();
-
-		//	Do we need to open all the files all at once, or as we go?
-		//	Depends on algorithm and data structure used.
-		//	openFiles(argv[1]);
+		int minute_of_day = getTime(); // needs to be extracted from LEAVEHOME
 		
-
-
-
-		//	Find optimal closest stop?	
-		origin_to_stop(origin_Lat, origin_Lon, dest_Lat, dest_Lon);
+		find_route(origin_Lat, origin_Lon, dest_Lat, dest_Lon, minute_of_day);	
 	}
 	return 0;
 }
