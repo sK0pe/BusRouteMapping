@@ -24,37 +24,26 @@ char* FOLDER;
  *	Holds pertinent data for Route information
  */
 typedef struct{
-	int id;
+	int n_stops;
 	char routeNumber[4];
 	char routeName[50];
-	int type;
-} Route;
-
+	char transport[50];
+	Stop stops[];
+	int arrivalTime[];
+	int departureTime[];
+} Trip;
 
 /*
  * Stop struct
  * Holds pertinent data for Stop information
  */
 typedef struct{
-	int location_type;
-	int parent_station;
 	int id;
 	int name[100];
-	int latitude;
-	int longitude;
-	StopTimes *available;
+	double latitude;
+	double longitude;
 } Stop;
 
-/*
- *	Stop Times struct
- *	Holds pertinent data for Stop times
- */
-typedef struct{
-	int trip_id;
-	int departs;
-	int stop_id;
-	int stop_sequence;
-}StopTimes;
 
 
 
