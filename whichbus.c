@@ -164,8 +164,6 @@ char *tokenizer(char *source, const char *delimiter){
 	return tokenStart;
 }
  
-
-
 /*
  *	getNumberOfLines()
  *	int
@@ -201,6 +199,55 @@ FILE* loadFile(FILE *stream, char*fileToLoad){
 	}
 	return stream;
 }
+
+/*
+ *	find_valid_stops
+ *	returns an array of stop ids which are within
+ *	walking distance of the input coordinates
+ */
+int *find_valid_stops(double latitude, double longitude){
+	FILE *stopData = NULL;
+	stopData = loadFile(stopData);
+	bool first = true;
+	//	Read through text file looking for valid stops
+	while(fgets(line, sizeof line, stopData) != NULL){
+		//	Skip first line
+		if(first){
+			first = false;
+			continue;
+		}
+		int fieldNum = 1;
+		//	find stop coordinates
+		char *field = tokenizer(line,",");
+		while(token != null){
+			//	field 6 has latitude
+			if(fieldNum == 6){
+				stop_lat = atof(token);
+				// next entry is guaranteed to be longitude
+				stop_lon = atof(tokenizer(NULL, ","));
+				break;
+			}
+			++fieldNum;
+			token = tokenizer(NULL, ",");
+		}
+		int originStops = 0;	//	Number of stops close enough to origin
+		int destinationStops = 0;	// Number of stops close enough to destination
+		// If close enough to origin, add 1
+		if(haversine(latitude, longitude, stop_lat, stop_lon) <= 1000){
+			originStops++;
+		}
+		if(haversine(latitude, longitude, stop_lat, stop_lon) <= 1000){
+			destinationStops++
+		}
+	}
+
+
+
+	if(stopData != NULL){
+		fclose(stopData);
+	}
+}
+
 
 /*
  * load_routes
