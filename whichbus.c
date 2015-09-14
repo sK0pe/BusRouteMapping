@@ -5,24 +5,8 @@
 #include <time.h>
 #include <string.h>
 
-//Don't understand why these are arbitrarily picked?
-#define MAX_ROUTE_LEN 200 
-#define MAX_FIELDS 20
-#define  MAX_STR_LEN      	150
-#define  MAX_FIELDS       	20
-#define  MAX_STOPS         	20000
-#define  MAX_ROUTES        	50000
-#define  MAX_ROUTE_LEN     	200
-#define  MAX_STOP_ID       	100000
-#define  MAX_ROUTE_ID       4000
-#define  MAX_TRIP_ID     	  750000
-
-#define WALK_SPEED 60			//unlikely to change
-#define MINS_IN_DAY 1440	//unlikely to change
-
-
 #define MAX_WAIT 60
-#define	MAX_WALK_DIST 1000
+#define	MAX_WALK 1000
 #define EARTH_RADIUS_M 6372797
 #define PI (acos(-1.0))
 //	Filenames
@@ -49,24 +33,6 @@ typedef struct{
 	double stop_lon;
 } Stop;
 
-/*
- *	Trip struct
- *	Holds pertinent data for a trip
- */
-typedef struct {
-	int n_stops;	// number of stops in the trip
-	char name[21];	// name of corresponding route
-	char transport[11];	// type of transport
-	Stop stops[MAX_ROUTE_LEN];	// array of stuct stop type
-	int arr_time[MAX_ROUTE_LEN];	// arrival times for each stop
-	int dep_time[MAX_ROUTE_LEN];	// departure times for each stop
-} Trip;
-
-/*********************DEFINE WHAT THIS IS***************/
-/*
- * Global Trip array
- */
-Trip trips[MAX_ROUTES];
 
 
 /*
@@ -160,7 +126,6 @@ int comma_indices(char source[], int idxs[]) {
 char *tokenizer(char *source, const char *delimiter){
 	static char *cursor = NULL;
 	char *tokenStart;
-	int n;
 	//	First time, point to start of source
 	if(source != NULL){
 		cursor = source;
@@ -170,13 +135,26 @@ char *tokenizer(char *source, const char *delimiter){
 		return NULL;
 	}
 
-	// number of characters up to the next delimiter
-	// from cursor's position
-	n = strcspn(cursor, delimiter);
 	// save cursor pointer
 	tokenStart = cursor;
-	// move cursor forward the token length
-	cursor += n;
+
+	// number of characters up to the next delimiter
+	// from cursor's position, not including those between
+	// speechmarks, while moving cursor forward the token
+	// length
+	int n=0;
+	bool quote = false;	
+	while(*cursor != '\0'){
+		if(*cursor == delimiter[0] && !quote){
+			break;
+		}
+		if(*cursor == '"'){
+			quote = !quote;
+		}		
+		n++;
+		cursor++;
+	}
+
 	// if cursor is not pointing to a nullbyte
 	// overwrite the delimiter with nullbyte and move forward
 	if(*cursor != '\0'){
