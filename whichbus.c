@@ -5,13 +5,31 @@
 #include <time.h>
 #include <string.h>
 
-#define	MAX_WALKING_DIST 1000
+//Don't understand why these are arbitrarily picked?
+#define MAX_ROUTE_LEN 200 
+#define MAX_FIELDS 20
+#define  MAX_STR_LEN      	150
+#define  MAX_FIELDS       	20
+#define  MAX_STOPS         	20000
+#define  MAX_ROUTES        	50000
+#define  MAX_ROUTE_LEN     	200
+#define  MAX_STOP_ID       	100000
+#define  MAX_ROUTE_ID       4000
+#define  MAX_TRIP_ID     	  750000
+
+#define WALK_SPEED 60			//unlikely to change
+#define MINS_IN_DAY 1440	//unlikely to change
+
+
+#define MAX_WAIT 60
+#define	MAX_WALK_DIST 1000
 #define EARTH_RADIUS_M 6372797
 #define PI (acos(-1.0))
 //	Filenames
 #define ROUTES		"/routes.txt"
 #define STOPS			"/stops.txt"
 #define STOPTIMES	"/stop_times.txt"
+#define TRIPS 		"/trips.txt"
 //	Global Variables
 int DAY;
 int TIME;
@@ -19,44 +37,36 @@ char* FOLDER;
 
 //	Struct Definitions
 
-/*	
- *	Route struct
- *	Holds pertinent data for Route information
- */
-typedef struct{
-	int id;
-	char routeNumber[4];
-	char routeName[50];
-	int type;
-} Route;
-
 
 /*
  * Stop struct
  * Holds pertinent data for Stop information
  */
 typedef struct{
-	int location_type;
-	int parent_station;
-	int id;
-	int name[100];
-	int latitude;
-	int longitude;
-	StopTimes *available;
+	int stop_id;
+	char stop_name[100];
+	double stop_lat;
+	double stop_lon;
 } Stop;
 
 /*
- *	Stop Times struct
- *	Holds pertinent data for Stop times
+ *	Trip struct
+ *	Holds pertinent data for a trip
  */
-typedef struct{
-	int trip_id;
-	int departs;
-	int stop_id;
-	int stop_sequence;
-}StopTimes;
+typedef struct {
+	int n_stops;	// number of stops in the trip
+	char name[21];	// name of corresponding route
+	char transport[11];	// type of transport
+	Stop stops[MAX_ROUTE_LEN];	// array of stuct stop type
+	int arr_time[MAX_ROUTE_LEN];	// arrival times for each stop
+	int dep_time[MAX_ROUTE_LEN];	// departure times for each stop
+} Trip;
 
-
+/*********************DEFINE WHAT THIS IS***************/
+/*
+ * Global Trip array
+ */
+Trip trips[MAX_ROUTES];
 
 
 /*
@@ -106,38 +116,36 @@ static double haversine(double lat1, double lon1, double lat2, double lon2){
 
 
 /* 
- * <unused due to context of project>
- * getTime
+ * get_time
  * int
- * returns int representing minute of day based on system time
- * and assigns the global variable DAY an integer
+ * returns int representing minute of day based on external parameter
+ * indicating time 24 hour format, extracted from a string.
  */
-int getTime(){
-	char hour[3], min[3], day[4];
-	time_t currentTime;
-	//	call current time in seconds from local system
-	time(&currentTime);
-	//	format to a tm struct details for local system
-	struct tm *detail = localtime(&currentTime);
-	//	extract hour, minute and day in string form
-	//	could also have extracted date and day 
-	strftime(hour, 3, "%H", detail);
-	strftime(min, 3, "%M", detail);
-	strftime(day, 4, "%a", detail);
-	//	assign global DAY the appropiate day
-	if(strcmp(day,"Mon")==0) DAY = 1;
-	else if(strcmp(day,"Tue")==0) DAY = 2;
-	else if(strcmp(day,"Wed")==0) DAY = 3;
-	else if(strcmp(day,"Thu")==0) DAY = 4;
-	else if(strcmp(day,"Fri")==0) DAY = 5;
-	else if(strcmp(day,"Sat")==0) DAY = 6;
-	else if(strcmp(day,"Sun")==0) DAY = 7;
-	else printf("getTime : Invalid day sourced from System");
-	
-	//	convert time to int 
-	int h = atoi(hour);
-	int m = atoi(min);	
-	return h*60 + m;
+int get_time(char timeString[]){
+	int hours = (timeString[0] - '0')*10 + (timeString[1] - '0');
+	int minutes = (timeString[3] - '0')*10 + (timeString[4] - '0'); 
+	return hours * 60 + minutes;
+}
+
+/*
+ * comma_indices
+ * in []
+ * finds the positions of all the comma delimeters in source
+ * and stores them in an integer array provided
+ * returns: the number of delimeters in the source
+ * ignores delimeters within quote enclosed fields 
+ */
+int comma_indices(char source[], int idxs[]) {
+	int numIndices = 0;
+	int length = strlen(source);
+	bool quote = false;
+	for (int i = 0; i < length; i++) {
+		if (source[i] == ',' && !quote)
+			idxs[numIndices++] = i;
+		if (source[i] == '"')
+			quote = !quote;
+	}
+	return numIndices;
 }
 
 /*
@@ -145,7 +153,7 @@ int getTime(){
  *	*char
  *	Takes a char array pointer as the source string,
  *	and a string indicating the delimiter on which to
- *	split the string.
+ *	split the source.
  *	Outputs each successive token from string including
  *	empty positions.
  */
@@ -210,12 +218,160 @@ FILE* loadFile(FILE *stream, char*fileToLoad){
 	printf("%s\n", path);
 	stream = fopen(path, "r");
 	if(stream == NULL){
-		printf("Cannot open path: %s\n", path);
+		printf("\nError: Cannot open path: %s\n", path);
 		exit(EXIT_FAILURE);
 	}
 	return stream;
 }
 
+/*
+ * load_routes
+ * int
+ * load route data from files
+ * returns: n_routes the total number of routes
+ */
+int load_routes(char folder[], Trip trips[]) {	
+	int   idxs[MAX_FIELDS];    // delimeter index positions in line
+
+	// load all stops - thinking of placing this into a function later
+	int stop_by_id[MAX_STOP_ID];   // for holding all the stop ids.
+	int n_stops = 0;               // total number of stops
+  char line[BUFSIZ];	// Buffer for reading lines
+ 
+	// open the file containing the stops
+	FILE* stopData = NULL;
+	stopData = loadFile(stopData, STOPS);
+		//	Stop array, size determined by finding number of lines in file
+	Stop all_stops[MAX_STOP_ID];  // for holding all the stops
+
+	while (fgets(line, sizeof line, stopData) != NULL) {
+		int commaCount = comma_indices(line, idxs);	
+		for (int i = 0; i < commaCount; i++){
+			line[idxs[i]] = '\0';	// write null byte over commas
+		}
+		
+		// read data from current stop	
+		int id = atoi(line + idxs[1] + 1);  // get the stop id
+
+		stop_by_id[id] = n_stops;					// update stop no 
+		all_stops[n_stops].stop_id = id; // update the stop id
+		strcpy(all_stops[n_stops].stop_name, line + idxs[3] + 1); // update the stop name
+		all_stops[n_stops].stop_lat = atof(line + idxs[5] + 1);   // update the stop latitude
+		all_stops[n_stops].stop_lon = atof(line + idxs[6] + 1);   // update the stop longitude
+		
+		n_stops++;
+	}
+	// close stopData file stream
+	if(stopData != NULL){
+		fclose(stopData);
+	}
+
+// load all routes  - thinking of placing this into a function later
+	struct {
+		int  type;								// the type of route (bus/train/ferry/..)
+		char name[100];  // name of route
+	} all_routes[MAX_ROUTE_ID];
+	
+	// open the file containing the routes
+	FILE* routeData = NULL;
+	routeData = loadFile(routeData, ROUTES);
+	
+	while (fgets(line, sizeof line, routeData) != NULL) {
+		int commaCount  = comma_indices(line, idxs);
+		for (int i = 0; i < commaCount; i++){
+			line[idxs[i]] = '\0';
+		}
+			
+		// read data from current route
+		int id = atoi(line); // get the route id
+		
+		all_routes[id].type = atoi(line + idxs[4] + 1);  // update the route transport type
+		strcpy(all_routes[id].name, line + idxs[1] + 1); // update the route name
+		strcat(all_routes[id].name, line + idxs[2] + 1);
+	}
+	//	close routeData filestream
+	if(routeData != NULL){
+		fclose(routeData);
+	}
+
+// load all the trips  - thinking of placing this into a function later
+	// this structure 
+	struct {
+		int route_id; 		// route id corresponding to this trip
+		int idx;          // index of current route in the output array
+	} all_trips[MAX_TRIP_ID];
+	
+	// open the file containing the trips
+	FILE *tripData = NULL;
+	tripData = loadFile(tripData, TRIPS);
+	
+	while (fgets(line, sizeof line, tripData)) {
+		int commaCount = comma_indices(line, idxs);
+		for (int i = 0; i < commaCount; i++)
+			line[idxs[i]] = '\0';
+
+		// read data from current trip
+		int id = atoi(line + idxs[1] + 1);  // get the trip id
+		
+		all_trips[id].route_id = atoi(line); // update the route id of the route corresponding to the trip
+		all_trips[id].idx = -1;             
+	}
+	// close tripData file stream
+	if(tripData != NULL){
+		fclose(tripData);
+	}
+
+	// now build the route connections  - thinking of placing this into a function later
+	memset(trips, '\0', sizeof(Trip) * MAX_ROUTES);
+
+	// open the file containing the stop times
+	FILE *stopTimeData = NULL;
+	stopTimeData = loadFile(stopTimeData, STOPTIMES);
+
+	int n_routes = 0;
+	
+ /* add every stop to the trips array one by one
+	* first check if the trip corresponding to the stop is already in the array
+	* if not, add trip to the array
+	* then add stop to the trip
+	*/
+	while (fgets(line, MAX_STR_LEN, stopTimeData)) {
+		int commaCount = comma_indices(line, idxs);
+		for (int i = 0; i < commaCount; i++){
+			line[idxs[i]] = '\0';
+		}
+		
+		// read data from current stop time
+		int trip_id = atoi(line);	// get the trip id
+		
+		if (all_trips[trip_id].idx < 0) {
+			all_trips[trip_id].idx = n_routes; // update the index of the trip corresponding to the route in the trips array
+			strcpy(trips[n_routes].name, all_routes[all_trips[trip_id].route_id].name);  // update the route name
+			
+			// get the route transport method
+			if (all_routes[all_trips[trip_id].route_id].type == 2){
+				strcpy(trips[n_routes].transport, "train");
+			}
+			else if (all_routes[all_trips[trip_id].route_id].type == 3){
+				strcpy(trips[n_routes].transport, "bus");
+			}
+			else if (all_routes[all_trips[trip_id].route_id].type == 4){
+				strcpy(trips[n_routes].transport, "ferry");
+			}
+				
+			n_routes++;
+		}
+		
+		int stop_id  = atoi(line + idxs[2] + 1); // get the stop id
+		int trip_idx = all_trips[trip_id].idx;   // get the current trip index
+
+		trips[trip_idx].stops[trips[trip_idx].n_stops] = all_stops[stop_by_id[stop_id]];   // update the stop id
+		trips[trip_idx].arr_time[trips[trip_idx].n_stops] = get_time(line + idxs[0] + 1);  // update the arrival time
+		trips[trip_idx].dep_time[trips[trip_idx].n_stops] = get_time(line + idxs[1] + 1);  // update the departure time
+		trips[trip_idx].n_stops++; 																 // update the number of associated stops
+	}
+	return n_routes; // return total number of built routes
+}
 
 /*
  *	loadStops()
@@ -269,11 +425,136 @@ void loadRoutes(){
 }
 
 /*
- * 	find_route()
+ * find_route
+ * 
+ * Performs search to find the optimal route using the data stored from above function
+ * since we are allowed to use only one mean of transport (current case), then look over all the trips
+ * and try getting to the destination location using this trip. Firstly, find the station which is closest
+ * to the starting loc, then find the station which is closest to the finish loc and choose the route which
+ * takes the minimum time, constantly updating our findings as we go
+ *
  */
-void find_route(double origin_Lat, double origin_Lon, double dest_Lat, double dest_Lon, int time){
-	loadStops();
+void find_route(Trip *trips, int n_routes, int start_time, double start_lat, double start_lon, double finish_lat, double finish_lon, int *i_route, int *i_start, int *i_end) {
+	*i_route = -1;	 	// the current best route
+	*i_start = -1;    // current best starting stop
+	*i_end   = -1;    // current best ending stop
+	
+	int     start;               // current starting stop
+	int     finish;              // current finishing stop
+	double  time;                // current elapsed journey time
+	double  wait_time;           // current waiting time at a stop
+	double  finish_time;         // current journey finishing time
+	double  ans_time = 1e20;     // current shortest route time
+	double  distance;            
+	
+	distance = haversine(start_lat, start_lon, finish_lat, finish_lon);
+	// walk to destination if close enough: NOTE: THIS may not be the optimal solution, it's possible there are route segments within 1000m that can get us to our destination earlier
+	if (distance < MAX_WALK_DIST) {
+		*i_route = n_routes;
+		ans_time = distance / WALK_SPEED;
+	}
+	
+	for (int i = 0; i < n_routes; i++) {
+		start = -1;
+		finish = -1;
+		finish_time = -1.0;
+		// try to go using this route, getting into vehicle on the first available station 
+		// find a station at which we can catch a bus/train/ferry
+		for (int j = 0; j < trips[i].n_stops; j++) {
+			distance = haversine(start_lat, start_lon, trips[i].stops[j].stop_lat, trips[i].stops[j].stop_lon);
+			// check that we have to go no more than 1000m
+			if (distance > MAX_WALK_DIST)
+				continue;
+			wait_time = trips[i].dep_time[j] - (start_time + distance / WALK_SPEED);
+			if (wait_time < 0.0)
+				wait_time += MINS_IN_DAY;
+			// check that the transport starts within 1 hr from leaving home
+			if (wait_time + distance / WALK_SPEED <= MAX_WAIT) {
+				start = j;
+				break;
+			}
+		}
+		if (start < 0)
+			continue;
+		// find a station at which we go out from transport
+		for (int j = start + 1; j < trips[i].n_stops; j++) {
+			distance = haversine(finish_lat, finish_lon, trips[i].stops[j].stop_lat, trips[i].stops[j].stop_lon);
+			// check that we have to go no more than 1 km
+			if (distance > MAX_WALK_DIST)
+				continue;
+			time = trips[i].arr_time[j] - start_time;
+			if (time < 0)
+				time += MINS_IN_DAY;
+			time += distance / WALK_SPEED;
+			if (finish < 0 || time < finish_time) {
+				finish_time = time;
+				finish = j;
+			}
+		}
+		if (finish < 0)
+			continue;
+		// if we have better answer using this route, update it
+		if (finish_time < ans_time) {
+			*i_route = i;            // update best route
+			*i_start = start;        // update starting stop
+			*i_end   = finish;       // update ending stop
+			ans_time = finish_time;  // update total time taken for journey (which must be under 3600)
+		}
+	}
 }
+
+/* 
+ *
+ * prints the result for a single segment journey
+ *
+ *
+ * needs to be broken down into functions
+ *
+ */
+void print_output(Trip * trips, int n_routes, int start_time, double start_lat, double start_lon, double finish_lat, double finish_lon, int i_route, int i_start, int i_end) {
+	double dist;
+	double time;
+	
+	if (i_route < 0) {
+		printf("No appropriate route is found!\n");
+	}
+	else if (i_route == n_routes) // our journey was reachable in walking distance.
+																// It is POSSIBLE that we could get to our destination within 1000m by still catching a transport segment. Can change for this later.
+	{ 
+		dist = haversine(start_lat, start_lon, finish_lat, finish_lon);
+		printf("%02d:%02d  walk  %dm  to  destination\n", start_time / 60, start_time % 60, (int)dist);
+		time = start_time + dist / WALK_SPEED;
+		if (time > MINS_IN_DAY)
+			time -= MINS_IN_DAY;
+		printf("%02d:%02d  arrive\n", (int)time / 60, (int)time % 60);
+	} 
+	else {
+		dist = haversine(start_lat, start_lon, trips[i_route].stops[i_start].stop_lat, trips[i_route].stops[i_start].stop_lon);
+		printf("%02d:%02d  walk  %dm  to  stop  %d  %s\n",
+				start_time / 60,
+				start_time % 60,
+				(int)dist,
+				trips[i_route].stops[i_start].stop_id,
+				trips[i_route].stops[i_start].stop_name);
+		printf("%02d:%02d  catch  %s  %s  to  stop  %d  %s\n",
+				trips[i_route].dep_time[i_start] / 60,
+				trips[i_route].dep_time[i_start] % 60,
+				trips[i_route].transport,
+				trips[i_route].name,
+				trips[i_route].stops[i_end].stop_id,
+				trips[i_route].stops[i_end].stop_name);
+		dist = haversine(finish_lat, finish_lon, trips[i_route].stops[i_end].stop_lat, trips[i_route].stops[i_end].stop_lon);
+		printf("%02d:%02d  walk  %dm  to  destination\n",
+				trips[i_route].arr_time[i_end] / 60,
+				trips[i_route].arr_time[i_end] % 60,
+				(int)dist);
+		time = trips[i_route].dep_time[i_end] + dist / WALK_SPEED;
+		if (time > MINS_IN_DAY)
+			time -= MINS_IN_DAY;
+		printf("%02d:%02d  arrive\n", (int)time / 60, (int)time % 60);
+	}
+}
+
 
 
 /*
@@ -308,11 +589,19 @@ int main(int argc, char *argv[]){
 		}
 		//	Define global variable for FOLDER
 		FOLDER = argv[1];
-		//	Get Current time
-		//	Addressing time in minutes allows for easy interpretation as a cost
-		int minute_of_day = getTime(); // needs to be extracted from LEAVEHOME
 		
-		find_route(origin_Lat, origin_Lon, dest_Lat, dest_Lon, minute_of_day);	
+		int n_routes;
+		int start_time;
+		int i_route;
+		int i_start;
+		int i_end;
+		
+		char cur_time[6];	
+		start_time = get_time(strncpy(cur_time, getenv("LEAVEHOME")+4, 5)); // get LEAVEHOME time in minutes
+		
+		n_routes = load_routes(FOLDER, trips);
+		find_route(trips, n_routes, start_time, origin_Lat, origin_Lon, dest_Lat, dest_Lon, &i_route, &i_start, &i_end);
+		print_output(trips, n_routes, start_time, origin_Lat, origin_Lon, dest_Lat, dest_Lon, i_route, i_start, i_end);
 	}
 	return 0;
 }
