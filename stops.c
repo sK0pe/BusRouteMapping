@@ -5,8 +5,16 @@
 #include <math.h>
 #define PI acos(-1.0)
 #define EARTH_RADIUS_M 6372797
+#define WALK_SPEED	60.0
+#define MAX_WALK 1000
 #define FOLDER "transperth"
 #define STOPS "/stops.txt"
+
+typedef struct {
+	int id;
+	char name[50];
+	double time_cost;
+} Stop;
 
 static double degrees_to_radians(double degrees){
 	return degrees*PI/180;
@@ -84,8 +92,14 @@ FILE* loadFile(FILE *stream, char*fileToLoad){
 
 
 
-
-int *find_valid_stops(double origLat, double origLon, double destLat, double destLon){
+/*
+ *	get_stop_arraysize
+ *	int *
+ *	Returns a pointer to integer array indicating the number of 
+ *	valid stops for origin and destination.
+ *
+ */
+int *get_stop_arraysize(double origLat, double origLon, double destLat, double destLon){
 	FILE *stopData = NULL;
 	stopData = loadFile(stopData,STOPS);
 	bool first = true;
@@ -118,10 +132,10 @@ int *find_valid_stops(double origLat, double origLon, double destLat, double des
 			field = tokenizer(NULL, ",");
 		}
 		// If close enough to origin, add 1
-		if(haversine(origLat, origLon, stop_lat, stop_lon) <= 1000){
+		if(haversine(origLat, origLon, stop_lat, stop_lon) <= MAX_WALK){
 			originStops++;
 		}
-		if(haversine(destLat, destLon, stop_lat, stop_lon) <= 1000){
+		if(haversine(destLat, destLon, stop_lat, stop_lon) <= MAX_WALK){
 			destinationStops++;
 		}
 	}
@@ -131,12 +145,109 @@ int *find_valid_stops(double origLat, double origLon, double destLat, double des
 	if(stopData != NULL){
 		fclose(stopData);
 	}
-	printf("%d\n", originStops);
-	printf("%d\n", destinationStops);
 	return arraySizes;
 }
 
+
+/*
+ * Populatse the Origin and Destination Stop
+ * Arrays with information from STOPS file
+ *
+ */
+void populate_stop_arrays(Stop *originStopsArr, Stop *destStopsArr, 
+		double origLat, double origLon, double destLat, double destLon){
+	
+	FILE *stopData = NULL;
+	stopData = loadFile(stopData,STOPS);
+	bool first = true;
+	char line[BUFSIZ];	//	Line buffer
+	int stop_id;
+	char *stop_name;
+	double origin_stop_cost;
+	double dest_stop_cost;
+	double stop_lat;
+	double stop_lon;
+	int origin_stop_counter = 0;
+	int dest_stop_counter = 0;
+	//	Read through text file looking for valid stops
+	while(fgets(line, sizeof line, stopData) != NULL){
+		//	Skip first line
+		if(first){
+			first = false;
+			continue;
+		}
+		int fieldNum = 0;
+		//	find stop coordinates
+		char *field = tokenizer(line,",");
+		while(field != NULL){
+			//	field 2 has latitude
+			if(fieldNum == 2){
+					stop_id = atoi(field);
+			}
+			//	field 4 has stop name
+			if(fieldNum == 4){
+				stop_name = field;
+			}
+			//	field 6 has latitude
+			if(fieldNum == 6){
+				stop_lat = atof(field);
+				//	If ield 6 is known than 7 is also known (longitude)
+				stop_lon = atof(tokenizer(NULL, ","));
+				origin_stop_cost = haversine(origLat, origLon, stop_lat, stop_lon);
+				dest_stop_cost = haversine(destLat, destLon, stop_lat, stop_lon);
+				if((origin_stop_cost <= MAX_WALK) && (origin_stop_cost < dest_stop_cost)){
+					//	Enter id
+					originStopsArr[origin_stop_counter].id = stop_id;
+					//	Enter name of stop
+					strcpy(originStopsArr[origin_stop_counter].name, stop_name);
+					//	Enter time cost
+					originStopsArr[origin_stop_counter].time_cost = origin_stop_cost/WALK_SPEED;
+					++origin_stop_counter;
+					break;
+				}
+				if((dest_stop_cost <= MAX_WALK) && (dest_stop_cost < origin_stop_cost)){
+					//	Enter id
+					destStopsArr[dest_stop_counter].id = stop_id;
+					//	Enter / copy over name
+					strcpy(destStopsArr[dest_stop_counter].name, stop_name);
+					//	Enter time cost
+					destStopsArr[dest_stop_counter].time_cost = dest_stop_cost/WALK_SPEED;
+					++dest_stop_counter;
+					break;
+				}
+			}
+			fieldNum++;
+			field = tokenizer(NULL, ",");
+		}
+	}
+}
+
+/*
+ *	find_valid_stops
+ *
+ *	Fills origin and destination arrays of type Stop with STOP file
+ *	information.
+ */
+ void find_valid_stops(double origLat, double origLon, double destLat, double destLon){
+	//	Find number of valid stops at origin and destination
+	int *size = get_stop_arraysize(origLat, origLon, destLat, destLon);
+	int originStopNumber = size[0];
+	int destStopNumber = size[1];
+	//	Make array of stops of appropriate size
+	Stop originStopsArr[ originStopNumber ];
+	Stop destStopsArr[ destStopNumber ];
+	//	Populate Stop Arrays
+	populate_stop_arrays(originStopsArr, destStopsArr, origLat, origLon, destLat, destLon);
+
+	for(int i = 0; i < originStopNumber; i++){
+		printf("%d is %s\n", originStopsArr[i].id, originStopsArr[i].name);
+	}
+
+}
+
+
 int main(void){
+	
 	
 	find_valid_stops(-32.014402,  115.758259,  -31.981039, 115.819120);
 
