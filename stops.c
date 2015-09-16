@@ -543,35 +543,50 @@ void get_route_name(int routeID, char* returnName){
 	populate_stop_arrays(originStopsArr, destStopsArr, origLat, origLon, destLat, destLon);
 	//	Find Optimal Trip
 	int min_trip[5];
-	find_optimal_trip(originStopsArr,originStopNumber, destStopsArr, destStopNumber, currentTime, min_trip);
+	for(int i = 0; i < 5; ++i){
+		min_trip[i] = -1;
+	}
 	
+	find_optimal_trip(originStopsArr,originStopNumber, destStopsArr, destStopNumber, currentTime, min_trip);
+	int walking_distance = (int)haversine(origLat, origLon, destLat, destLon);
+	int walking_time = (int)walking_distance/WALK_SPEED;
+
 	int min_OriginIndex = min_trip[0];
 	int min_DestIndex = min_trip[1];
 	int route_id = get_route_id(min_trip[4]);
 	char route_name[50]; 
 	get_route_name(route_id, route_name);
-
-
-	printf("%d walk %fm to stop %d %s\n%d catch %s to stop %d %s\n%d walk %fm to destination\n%d arrive\n",
-			currentTime,
-				originStopsArr[min_OriginIndex].distance,
-					originStopsArr[min_OriginIndex].id,
-						originStopsArr[min_OriginIndex].name,
-							min_trip[2],
-								route_name,
-									destStopsArr[min_DestIndex].id,
-										destStopsArr[min_DestIndex].name,
-											min_trip[3],
-												destStopsArr[min_DestIndex].distance,
-													min_trip[3]+(int)(destStopsArr[min_DestIndex].distance/60.0));
+	int arrival = min_trip[3] + (int)(destStopsArr[min_DestIndex].distance/WALK_SPEED);
+	int walk_arrival = currentTime + walking_time;
 	
+	if(min_trip[0] == -1){
+		//	If appropriate journey found
+		printf("%02d:%02d not possible\n", currentTime/60, currentTime%60);
+	}
+	else if(walking_distance < MAX_WALK && walk_arrival < arrival){
+		printf("%02d:%02d walk %dm to destination\n%02d:%02d arrive\n", currentTime/60, currentTime%60, walking_distance, walk_arrival/60, walk_arrival%60);
+	}
+	else{
+		printf("%02d:%02d walk %dm to stop %d %s\n%02d:%02d catch %s to stop %d %s\n%02d:%02d walk %dm to destination\n%02d:%02d arrive\n",
+				currentTime/60, currentTime%60,
+					(int)originStopsArr[min_OriginIndex].distance,
+						originStopsArr[min_OriginIndex].id,
+							originStopsArr[min_OriginIndex].name,
+								min_trip[2]/60, min_trip[2]%60,
+									route_name,
+										destStopsArr[min_DestIndex].id,
+											destStopsArr[min_DestIndex].name,
+												min_trip[3]/60, min_trip[3]%60,
+													(int)destStopsArr[min_DestIndex].distance,
+														arrival/60, arrival%60);
+	}	
 }
 
 
 int main(void){
 	
 	
-	find_valid_stops(-32.014402,  115.758259,  -31.981039, 115.819120, get_time("10:56"));
+	find_valid_stops(-31.745387, 115.767455, -31.954131, 115.858761, get_time("10:56"));
 
 
 	return 0;
