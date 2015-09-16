@@ -15,7 +15,7 @@
 typedef struct {
 	int id;
 	char name[50];
-	double time_cost;
+	double distance;
 } Stop;
 
 static double degrees_to_radians(double degrees){
@@ -163,7 +163,10 @@ int *get_stop_arraysize(double origLat, double origLon, double destLat, double d
 
 
 /*
- * Populatse the Origin and Destination Stop
+ * populate_stop_arrays
+ * void
+ * Helper function for find_valid_stops
+ * Populates the Origin and Destination Stop
  * Arrays with information from STOPS file
  *
  */
@@ -216,7 +219,7 @@ void populate_stop_arrays(Stop *originStopsArr, Stop *destStopsArr,
 					//	Enter name of stop
 					strcpy(originStopsArr[origin_stop_counter].name, stop_name);
 					//	Enter time cost
-					originStopsArr[origin_stop_counter].time_cost = origin_stop_cost;
+					originStopsArr[origin_stop_counter].distance = origin_stop_cost;
 					++origin_stop_counter;
 					break;
 				}
@@ -226,7 +229,7 @@ void populate_stop_arrays(Stop *originStopsArr, Stop *destStopsArr,
 					//	Enter / copy over name
 					strcpy(destStopsArr[dest_stop_counter].name, stop_name);
 					//	Enter time cost
-					destStopsArr[dest_stop_counter].time_cost = dest_stop_cost;
+					destStopsArr[dest_stop_counter].distance = dest_stop_cost;
 					++dest_stop_counter;
 					break;
 				}
@@ -241,28 +244,24 @@ void populate_stop_arrays(Stop *originStopsArr, Stop *destStopsArr,
 	}
 }
 
+
 /*
- *	find_valid_stops
+ *	find_optimal_trip
+ *	int *
+ *	Helper function for find_valid_stops
+ *	Opens and cycles through STOPTIMES looking for trips
+ *	that will connect stops within originStopsArr and 
+ *	destStopsArr, then find the minimum arrival time at
+ *	the destination.
+ *	Returns the array indicies and values regarding the optimal
+ *	trip.
  *
- *	Fills origin and destination arrays of type Stop with STOP file
- *	information.
  */
- void find_valid_stops(double origLat, double origLon, double destLat, double destLon, int currentTime){
-	//	Find number of valid stops at origin and destination
-	int *size = get_stop_arraysize(origLat, origLon, destLat, destLon);
-	int originStopNumber = size[0];
-	int destStopNumber = size[1];
-	//	Make array of stops of appropriate size
-	Stop originStopsArr[ originStopNumber ];
-	Stop destStopsArr[ destStopNumber ];
-	//	Populate Stop Arrays
-	populate_stop_arrays(originStopsArr, destStopsArr, origLat, origLon, destLat, destLon);
-	
-
-
-
+int *find_optimal_trip(Stop *originStopsArr, int originStopNumber, 
+		Stop *destStopsArr, int destStopNumber, int currentTime, int *optimal_stops){
 	
 	FILE *stopTimeData = NULL;
+	//	Open STOPTIMES file
 	stopTimeData = loadFile(stopTimeData, STOPTIMES);
 	bool first = true;	//	boolean to skip first line
 	char line[BUFSIZ];	//	buffer for line
@@ -272,25 +271,16 @@ void populate_stop_arrays(Stop *originStopsArr, Stop *destStopsArr,
 	int departureTime;
 	int stop_id;
 	//	optimal value variables
-	int min_totalCost = -1;
-	int min_arrivalTime;
-	int min_trip_id;
-	int min_departureTime;
-	int min_origin_stop;
-	int min_dest_stop;
-	int min_walk1;
-	int min_walk2;
-	//	Checking for arrival or departure
+	int min_timeCost = -1;
+	//	Checking for arrival or departure, start with looking for departure
 	bool validDepartureFound = false;
 	int validDepartureTime;
 	int validTrip_id;
-	int validDepartureStop;
-	double validWalk1;
-	int validWalkTime1;
-	//	Optimisation
+	int validIndex;
+	//	Boolean marker to check whether to skip processing of line due
+	//	to logically invalid possibilities
 	bool skipLine = false;
-	//	Read through file STOPTIMES for trips that connect arrival and
-	//	destination
+	//	Loop Variables
 	int fieldNum;
 	char *field;
 	while(fgets(line, sizeof line, stopTimeData) != NULL){
@@ -343,57 +333,93 @@ void populate_stop_arrays(Stop *originStopsArr, Stop *destStopsArr,
 
 		//	Checking for valid link between stops
 		//	validTrip_id may be a double check from field 0 check above
-		if(validDepartureFound){
-			if(arrivalTime > validDepartureTime){
-				for(int j = 0; j < destStopNumber; j++){
-					//	if valid origin to destination link found 
-					if(stop_id == destStopsArr[j].id){
-						int validTime = validWalkTime1 + arrivalTime - validDepartureTime + (int)ceil(destStopsArr[j].time_cost/WALK_SPEED);
-						//	Check for less than 0 min_totalCost meaning no links are yet found
-						if(min_totalCost > validTime || min_totalCost < 0){
-								min_totalCost = validTime;
-								min_walk1 = (int) ceil(validWalk1);
-								min_departureTime = validDepartureTime;
-								min_origin_stop = validDepartureStop;
-								min_trip_id = validTrip_id;
-								min_dest_stop = stop_id;
-								min_arrivalTime = arrivalTime;
-								min_walk2 = (int) ceil(destStopsArr[j].time_cost);
-						}
+		if(validDepartureFound && arrivalTime > validDepartureTime){
+			for(int j = 0; j < destStopNumber; j++){
+			//	if valid origin to destination link found 
+				if(stop_id == destStopsArr[j].id){
+					//	The total cost of walking to the stop + wait + travel time + walking to destination is the following expression 
+					//	validWalkTime1 + (validDepartureTime - validWalkTime1) + arrivalTime - validDepartureTime + (int)ceil(destStopsArr[j].distance/WALK_SPEED);
+					//	However this can be simplified to arrival time + time to walk to destination
+					int validTime = arrivalTime + (int)ceil(destStopsArr[j].distance/WALK_SPEED);
+					//	Check for less than 0 min_timeCost meaning no links are yet found
+					if(min_timeCost > validTime || min_timeCost < 0){
+							min_timeCost = validTime;
+							//	returning array of valid indices to construct answer from
+							optimal_stops[0] = validIndex;
+							optimal_stops[1] = j;
+							optimal_stops[2] = validDepartureTime;
+							optimal_stops[3] = arrivalTime;
+							optimal_stops[4] = validTrip_id;
 					}
 				}
 			}
 		}
+		
 		//	Check for valid origin
 		for(int i = 0; i < originStopNumber; i++){
 			//	Check if stop is a valid origin
 			if(stop_id == originStopsArr[i].id){
 				//																				printf("anything here");
 				//	Check if valid departure (i.e. walk to stop in time)
-				int origin_timecost = (int)ceil(originStopsArr[i].time_cost/WALK_SPEED);
+				int origin_timecost = (int)ceil(originStopsArr[i].distance/WALK_SPEED);
 				if(currentTime + origin_timecost < departureTime){
 					validDepartureFound = true;
-					//	If true 
+					//	If true, record departure details
 					validDepartureTime = departureTime;
 					validTrip_id = trip_id;
-					validDepartureStop = stop_id;
-					validWalk1 = originStopsArr[i].time_cost;
-					validWalkTime1 = origin_timecost;
+					validIndex = i;
 				}
 			}
 		}
 	}
-	
 	if(stopTimeData != NULL){
 		fclose(stopTimeData);
 	}
+	return optimal_stops;
+}
 
-	printf("%d walk %dm to stop %d\n%d catch %d to stop %d\n%d walk %dm to destination\n%d arrive\n",
-			currentTime,min_walk1, min_origin_stop, min_departureTime, min_trip_id, min_dest_stop, min_arrivalTime, min_walk2, min_totalCost+currentTime);
+
+/*
+ *	find_valid_stops
+ *
+ *	Fills origin and destination arrays of type Stop with STOP file
+ *	information.
+ */
+ void find_valid_stops(double origLat, double origLon, double destLat, double destLon, int currentTime){
+	//	Find number of valid stops at origin and destination
+	int *size = get_stop_arraysize(origLat, origLon, destLat, destLon);
+	int originStopNumber = size[0];
+	int destStopNumber = size[1];
+	//	Make array of stops of appropriate size
+	Stop originStopsArr[ originStopNumber ];
+	Stop destStopsArr[ destStopNumber ];
+	//	Populate Stop Arrays
+	populate_stop_arrays(originStopsArr, destStopsArr, origLat, origLon, destLat, destLon);
+	//	Find Optimal Trip
+	int min_trip[5];
+	find_optimal_trip(originStopsArr,originStopNumber, destStopsArr, destStopNumber, currentTime, min_trip);
+	
+	int min_OriginIndex = min_trip[0];
+	int min_DestIndex = min_trip[1];
+
+	double min_walk1 = originStopsArr[min_OriginIndex].distance;
+	int min_origin_stop = originStopsArr[min_OriginIndex].id;
+	char *origin_stop_name = originStopsArr[min_OriginIndex].name;
+	int min_departureTime = min_trip[2];
+	int min_trip_id = min_trip[4];
+	int min_dest_stop = destStopsArr[min_DestIndex].id;
+	char *dest_stop_name = destStopsArr[min_DestIndex].name;
+	int min_arrivalTime = min_trip[3];
+	double min_walk2 = destStopsArr[min_DestIndex].distance;
+
+
+
+	printf("%d walk %fm to stop %d %s\n%d catch %d to stop %d %s\n%d walk %fm to destination\n%d arrive\n",
+			currentTime,min_walk1, min_origin_stop, origin_stop_name, min_departureTime, min_trip_id, min_dest_stop, dest_stop_name, min_arrivalTime, min_walk2, min_arrivalTime+(int)min_walk2);
 
 	/*
 	for(int i = 0; i < originStopNumber; i++){
-		printf("cost is %f\n", originStopsArr[i].time_cost);
+		printf("cost is %f\n", originStopsArr[i].distance);
 	}*/
 	
 }
