@@ -3,14 +3,18 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+//	Arithmetic constants and problem definitions
 #define PI acos(-1.0)
 #define EARTH_RADIUS_M 6372797
 #define WALK_SPEED 60.0
 #define MAX_WAIT 60
 #define MAX_WALK 1000
+//	File locations
 #define FOLDER "transperth"
 #define STOPS "/stops.txt"
 #define STOPTIMES "/stop_times.txt"
+#define TRIPS "/trips.txt"
+#define	ROUTES "/routes.txt"
 
 typedef struct {
 	int id;
@@ -89,6 +93,7 @@ int get_time(char timeString[]){
 	int minutes = (timeString[3] - '0')*10 + (timeString[4] - '0'); 
 	return hours * 60 + minutes;
 }
+
 
 
 FILE* loadFile(FILE *stream, char*fileToLoad){
@@ -359,7 +364,6 @@ int *find_optimal_trip(Stop *originStopsArr, int originStopNumber,
 		for(int i = 0; i < originStopNumber; i++){
 			//	Check if stop is a valid origin
 			if(stop_id == originStopsArr[i].id){
-				//																				printf("anything here");
 				//	Check if valid departure (i.e. walk to stop in time)
 				int origin_timecost = (int)ceil(originStopsArr[i].distance/WALK_SPEED);
 				if(currentTime + origin_timecost < departureTime){
@@ -377,6 +381,148 @@ int *find_optimal_trip(Stop *originStopsArr, int originStopNumber,
 	}
 	return optimal_stops;
 }
+
+/*
+ *	get_route_id
+ *	int
+ *	Takes trip_id as input, matches it in 
+ *	TRIPS file to find route_id and
+ *	returns it as an integer.
+ *
+ */
+int get_route_id(int trip){
+	//	Open and search TRIPS file
+	FILE *tripData = NULL;
+	tripData = loadFile(tripData, TRIPS);
+	bool first = true;	//	boolean to skip first line
+	char line[BUFSIZ];	//	character array for line read buffer
+	int routeID;
+	bool tripFound = false;
+	//	Loop through text file
+	int fieldNum;
+	char *field;
+	while(fgets(line, sizeof line, tripData) != NULL){
+		//	Skip First Line
+		if(first){
+			first = false;
+			continue;
+		}
+		fieldNum = 0;
+		field = tokenizer(line, ",");
+		//	Loop through tokens produced
+		while(field != NULL){
+			//	field 0 has route_id
+			if(fieldNum == 0){
+				routeID = atoi(field);
+			}
+			//	field 2 has trip_id
+			if(fieldNum == 2){
+				if(atoi(field) == trip){
+					tripFound = true;
+					break;
+				}
+			}
+			fieldNum++;
+			field = tokenizer(NULL, ",");
+		}
+		if(tripFound){
+			break;
+		}
+	}
+	//	Close file
+	if(tripData != NULL){
+		fclose(tripData);
+	}
+	return routeID;
+}
+
+
+/*
+ *	get_route_name
+ *	void
+ *	Populates a character array with the route name of
+ *	the route_id provided, reading the ROUTES file.
+ *
+ */
+void get_route_name(int routeID, char* returnName){
+	// Open and search ROUTES file
+	FILE *routeData = NULL;
+	routeData = loadFile(routeData, ROUTES);
+	char line[BUFSIZ];	//	line read in buffer
+	bool first = true;	//	skip first line
+	int transportType;
+	char shortName[4];
+	char longName[30];
+	bool skipLine = false;
+	bool found = false;
+	int fieldNum;
+	char *field;
+	while(fgets(line, sizeof line, routeData) != NULL){
+		//	Skip First Line
+		if(first){
+			first = false;
+			continue;
+		}
+		fieldNum = 0;
+		field = tokenizer(line, ",");
+		//	Loop through tokens produced
+		while(field != NULL){
+			//	field 0 has route_id
+			if(fieldNum == 0){
+				//	Only process routeID this way
+				if(routeID != atoi(field)){
+					skipLine = true;
+					break;
+				}
+				else{
+					found = true;
+				}
+			}
+			//	field 2 has route_short_name
+			if(fieldNum == 2){
+				strcpy(shortName, field);
+			}
+			//	field 3 has route_long_name
+			if(fieldNum == 3){
+				strcpy(longName, field);
+			}
+			//	field 5 defines tranpsort type
+			if(fieldNum == 5){
+				transportType = atoi(field);
+			}
+			fieldNum++;
+			field = tokenizer(NULL, ",");
+		}
+		//	Skip line processing if indicated
+		if(skipLine){
+			skipLine = false;
+			continue;
+		}
+		//	Found route ID, don't need to go through any more lines
+		if(found){
+			break;
+		}
+	}
+	//	Close file
+	if(routeData != NULL){
+		fclose(routeData);
+	}
+	//	Construt route name description
+	switch(transportType){
+		case 2 :
+			strcpy(returnName, "train ");
+			strcat(returnName, longName);
+			break;
+		case 3 :
+			strcpy(returnName, "bus ");
+			strcat(returnName, shortName);
+			strcat(returnName, longName);
+			break;
+		case 4 :
+			strcpy(returnName, longName);
+	}
+}
+
 
 
 /*
@@ -401,26 +547,23 @@ int *find_optimal_trip(Stop *originStopsArr, int originStopNumber,
 	
 	int min_OriginIndex = min_trip[0];
 	int min_DestIndex = min_trip[1];
-
-	double min_walk1 = originStopsArr[min_OriginIndex].distance;
-	int min_origin_stop = originStopsArr[min_OriginIndex].id;
-	char *origin_stop_name = originStopsArr[min_OriginIndex].name;
-	int min_departureTime = min_trip[2];
-	int min_trip_id = min_trip[4];
-	int min_dest_stop = destStopsArr[min_DestIndex].id;
-	char *dest_stop_name = destStopsArr[min_DestIndex].name;
-	int min_arrivalTime = min_trip[3];
-	double min_walk2 = destStopsArr[min_DestIndex].distance;
+	int route_id = get_route_id(min_trip[4]);
+	char route_name[50]; 
+	get_route_name(route_id, route_name);
 
 
-
-	printf("%d walk %fm to stop %d %s\n%d catch %d to stop %d %s\n%d walk %fm to destination\n%d arrive\n",
-			currentTime,min_walk1, min_origin_stop, origin_stop_name, min_departureTime, min_trip_id, min_dest_stop, dest_stop_name, min_arrivalTime, min_walk2, min_arrivalTime+(int)min_walk2);
-
-	/*
-	for(int i = 0; i < originStopNumber; i++){
-		printf("cost is %f\n", originStopsArr[i].distance);
-	}*/
+	printf("%d walk %fm to stop %d %s\n%d catch %s to stop %d %s\n%d walk %fm to destination\n%d arrive\n",
+			currentTime,
+				originStopsArr[min_OriginIndex].distance,
+					originStopsArr[min_OriginIndex].id,
+						originStopsArr[min_OriginIndex].name,
+							min_trip[2],
+								route_name,
+									destStopsArr[min_DestIndex].id,
+										destStopsArr[min_DestIndex].name,
+											min_trip[3],
+												destStopsArr[min_DestIndex].distance,
+													min_trip[3]+(int)(destStopsArr[min_DestIndex].distance/60.0));
 	
 }
 
