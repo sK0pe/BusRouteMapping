@@ -89,7 +89,7 @@ static double haversine(double lat1, double lon1, double lat2, double lon2){
  * returns int representing minute of day based on external parameter
  * indicating time 24 hour format, extracted from a string.
  */
-int get_time(char timeString[]){
+static int get_time(char timeString[]){
 	int hours = (timeString[0] - '0')*10 + (timeString[1] - '0');
 	int minutes = (timeString[3] - '0')*10 + (timeString[4] - '0'); 
 	return hours * 60 + minutes;
@@ -106,7 +106,7 @@ int get_time(char timeString[]){
  *	Outputs each successive token from string including
  *	empty positions when source is passed as NULL.
  */
-char *tokenizer(char *source, const char *delimiter){
+static char *tokenizer(char *source, const char *delimiter){
 	static char *cursor = NULL;
 	char *tokenStart;
 	//	First time, point to start of source
@@ -153,7 +153,7 @@ char *tokenizer(char *source, const char *delimiter){
  *	Takes NULL FILE * and char *
  *	To make a generic file loader with included error check
  */
-FILE* loadFile(FILE *stream, char*fileToLoad){
+static FILE* loadFile(FILE *stream, char*fileToLoad){
 	char path[200];
 	strcpy(path, FOLDER);
 	strcat(path, fileToLoad);
@@ -172,7 +172,7 @@ FILE* loadFile(FILE *stream, char*fileToLoad){
  *	valid stops for origin and destination.
  *
  */
-int *get_stop_arraysize(double origLat, double origLon, double destLat, double destLon){
+static int *get_stop_arraysize(double origLat, double origLon, double destLat, double destLon){
 	FILE *stopData = NULL;
 	stopData = loadFile(stopData,STOPS);
 	bool first = true;
@@ -230,7 +230,7 @@ int *get_stop_arraysize(double origLat, double origLon, double destLat, double d
  * Arrays with information from STOPS file
  *
  */
-void populate_stop_arrays(Stop *originStopsArr, Stop *destStopsArr, 
+static void populate_stop_arrays(Stop *originStopsArr, Stop *destStopsArr, 
 		double origLat, double origLon, double destLat, double destLon){
 	
 	FILE *stopData = NULL;
@@ -317,7 +317,7 @@ void populate_stop_arrays(Stop *originStopsArr, Stop *destStopsArr,
  *	trip.
  *
  */
-int *find_optimal_trip(Stop *originStopsArr, int originStopNumber, 
+static int *find_optimal_trip(Stop *originStopsArr, int originStopNumber, 
 		Stop *destStopsArr, int destStopNumber, int currentTime, int *optimal_stops){
 	
 	FILE *stopTimeData = NULL;
@@ -446,7 +446,7 @@ int *find_optimal_trip(Stop *originStopsArr, int originStopNumber,
  *	returns it as an integer.
  *
  */
-int get_route_id(int trip){
+static int get_route_id(int trip){
 	//	Open and search TRIPS file
 	FILE *tripData = NULL;
 	tripData = loadFile(tripData, TRIPS);
@@ -500,7 +500,7 @@ int get_route_id(int trip){
  *	the route_id provided, reading the ROUTES file.
  *
  */
-void get_route_name(int routeID, char* returnName){
+static void get_route_name(int routeID, char* returnName){
 	// Open and search ROUTES file
 	FILE *routeData = NULL;
 	routeData = loadFile(routeData, ROUTES);
@@ -508,7 +508,7 @@ void get_route_name(int routeID, char* returnName){
 	bool first = true;	//	skip first line
 	int transportType;
 	char shortName[4];
-	char longName[30];
+	char longName[40];
 	bool skipLine = false;
 	bool found = false;
 	int fieldNum;
@@ -591,7 +591,7 @@ void get_route_name(int routeID, char* returnName){
  *	Fills origin and destination arrays of type Stop with STOP file
  *	information.
  */
- void find_valid_stops(double origLat, double origLon, double destLat, double destLon, int currentTime){
+static void find_valid_stops(double origLat, double origLon, double destLat, double destLon, int currentTime){
 	//	Find number of valid stops at origin and destination
 	int *size = get_stop_arraysize(origLat, origLon, destLat, destLon);
 	int originStopNumber = size[0];
