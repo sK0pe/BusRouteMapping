@@ -540,10 +540,13 @@ static void get_route_name(int routeID, char* returnName){
 			}
 			//	field 3 has route_long_name
 			if(fieldNum == 3){
-				if (strlen(field)){
+				if (strlen(field) > 0){
 					strcpy(longName, "\"");
 					strcat(longName, field);
 					strcat(longName, "\"");
+				}
+				else{
+					strcpy(longName, field);
 				}
 			}
 			//	field 5 defines tranpsort type
@@ -581,6 +584,7 @@ static void get_route_name(int routeID, char* returnName){
 		case 4 :
 			strcpy(returnName, "ferry  ");
 			strcat(returnName, longName);
+			break;
 	}
 }
 
