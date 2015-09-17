@@ -272,7 +272,7 @@ void populate_stop_arrays(Stop *originStopsArr, Stop *destStopsArr,
 				//	If ield 6 is known than 7 is also known (longitude)
 				stop_lon = atof(tokenizer(NULL, ","));
 				origin_stop_cost = haversine(origLat, origLon, stop_lat, stop_lon);
-				dest_stop_cost = haversine(destLat, destLon, stop_lat, stop_lon);
+				dest_stop_cost = haversine(stop_lat, stop_lon, destLat, destLon);
 				if((origin_stop_cost <= MAX_WALK) && (origin_stop_cost < dest_stop_cost)){
 					//	Enter id
 					originStopsArr[origin_stop_counter].id = stop_id;
@@ -280,7 +280,7 @@ void populate_stop_arrays(Stop *originStopsArr, Stop *destStopsArr,
 					strcpy(originStopsArr[origin_stop_counter].name, stop_name);
 					//	Enter time cost
 					originStopsArr[origin_stop_counter].distance = origin_stop_cost;
-					++origin_stop_counter;
+					origin_stop_counter++;
 					break;
 				}
 				if((dest_stop_cost <= MAX_WALK) && (dest_stop_cost < origin_stop_cost)){
@@ -290,7 +290,7 @@ void populate_stop_arrays(Stop *originStopsArr, Stop *destStopsArr,
 					strcpy(destStopsArr[dest_stop_counter].name, stop_name);
 					//	Enter time cost
 					destStopsArr[dest_stop_counter].distance = dest_stop_cost;
-					++dest_stop_counter;
+					dest_stop_counter++;
 					break;
 				}
 			}
@@ -373,7 +373,7 @@ int *find_optimal_trip(Stop *originStopsArr, int originStopNumber,
 			if(fieldNum == 2){
 				departureTime = get_time(field);
 				//	departures can't be more than an hour after leaving home
-				if(departureTime < currentTime || departureTime > currentTime + MAX_WAIT){
+				if(!validDepartureFound && (departureTime < currentTime || departureTime > currentTime + MAX_WAIT)){
 					skipLine = true;
 					break;
 				}
@@ -390,6 +390,7 @@ int *find_optimal_trip(Stop *originStopsArr, int originStopNumber,
 			skipLine = false;
 			continue;
 		}
+		
 		//	Checking for valid link between stops
 		//	validTrip_id may be a double check from field 0 check above
 		if(validDepartureFound && arrivalTime > validDepartureTime){
@@ -413,7 +414,7 @@ int *find_optimal_trip(Stop *originStopsArr, int originStopNumber,
 				}
 			}
 		}
-		
+
 		//	Check for valid origin
 		for(int i = 0; i < originStopNumber; i++){
 			//	Check if stop is a valid origin
@@ -614,7 +615,7 @@ void get_route_name(int routeID, char* returnName){
 	//	Get route ID
 	int route_id = get_route_id(min_trip[4]);
 	// Get route name
-	char route_name[50]; 
+	char route_name[60]; 
 	get_route_name(route_id, route_name);
 	// Arrival Times
 	int arrival = min_trip[3] + (int)ceil(destStopsArr[min_DestIndex].distance/WALK_SPEED);
