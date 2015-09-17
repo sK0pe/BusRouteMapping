@@ -420,7 +420,7 @@ int *find_optimal_trip(Stop *originStopsArr, int originStopNumber,
 			//	Check if stop is a valid origin
 			if(stop_id == originStopsArr[i].id){
 				//	Check if valid departure (i.e. walk to stop in time)
-				int origin_timecost = (int)ceil(originStopsArr[i].distance/WALK_SPEED);
+				int origin_timecost = (int)(originStopsArr[i].distance/WALK_SPEED);
 				if(currentTime + origin_timecost < departureTime){
 					validDepartureFound = true;
 					//	If true, record departure details
