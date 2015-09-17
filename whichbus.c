@@ -539,7 +539,11 @@ void get_route_name(int routeID, char* returnName){
 			}
 			//	field 3 has route_long_name
 			if(fieldNum == 3){
-				strcpy(longName, field);
+				if (strlen(field)){
+					strcpy(longName, "\"");
+					strcat(longName, field);
+					strcat(longName, "\"");
+				}
 			}
 			//	field 5 defines tranpsort type
 			if(fieldNum == 5){
@@ -565,16 +569,17 @@ void get_route_name(int routeID, char* returnName){
 	//	Construt route name description
 	switch(transportType){
 		case 2 :
-			strcpy(returnName, "train ");
+			strcpy(returnName, "rail  ");
 			strcat(returnName, longName);
 			break;
 		case 3 :
-			strcpy(returnName, "bus ");
+			strcpy(returnName, "bus  ");
 			strcat(returnName, shortName);
 			strcat(returnName, longName);
 			break;
 		case 4 :
-			strcpy(returnName, longName);
+			strcpy(returnName, "ferry  ");
+			strcat(returnName, longName);
 	}
 }
 
@@ -612,23 +617,23 @@ void get_route_name(int routeID, char* returnName){
 	char route_name[50]; 
 	get_route_name(route_id, route_name);
 	// Arrival Times
-	int arrival = min_trip[3] + (int)(destStopsArr[min_DestIndex].distance/WALK_SPEED);
+	int arrival = min_trip[3] + (int)ceil(destStopsArr[min_DestIndex].distance/WALK_SPEED);
 	// Calculate walking time and distance to see if walking is faster than taking a trip
-	int walking_distance = (int)haversine(origLat, origLon, destLat, destLon);
-	int walking_time = (int)walking_distance/WALK_SPEED;
+	double walking_distance = haversine(origLat, origLon, destLat, destLon);
+	int walking_time = (int)ceil(walking_distance/WALK_SPEED);
 	int walk_arrival = currentTime + walking_time;
 	
 	if(min_trip[0] == -1){
 		//	If no appropriate journey found
-		printf("%02d:%02d not possible\n", currentTime/60, currentTime%60);
+		printf("%02d:%02d  not  possible\n", currentTime/60, currentTime%60);
 	}
 	else if(walking_distance < MAX_WALK && walk_arrival < arrival){
 		// If walking is faster than taking public transport
-		printf("%02d:%02d walk %dm to destination\n%02d:%02d arrive\n", currentTime/60, currentTime%60, walking_distance, walk_arrival/60, walk_arrival%60);
+		printf("%02d:%02d  walk  %dm  to  destination\n%02d:%02d  arrive\n", currentTime/60, currentTime%60, (int)walking_distance, walk_arrival/60, walk_arrival%60);
 	}
 	else{
 		// If taking public transport
-		printf("%02d:%02d walk %dm to stop %d %s\n%02d:%02d catch %s to stop %d %s\n%02d:%02d walk %dm to destination\n%02d:%02d arrive\n",
+		printf("%02d:%02d  walk  %dm  to  stop  %d  %s\n%02d:%02d  catch  %s  to  stop  %d  %s\n%02d:%02d  walk  %dm  to  destination\n%02d:%02d  arrive\n",
 				currentTime/60, currentTime%60,
 					(int)originStopsArr[min_OriginIndex].distance,
 						originStopsArr[min_OriginIndex].id,
@@ -673,7 +678,7 @@ int main(int argc, char *argv[]){
 		}
 		//	Define global variable for FOLDER
 		FOLDER = argv[1];
-		// Souce time from environmental variable LEAVEHOME
+		// Source time from environmental variable LEAVEHOME
 		char cur_time[6];
 		int start_time = get_time(strncpy(cur_time, getenv("LEAVEHOME")+4, 5));
 		if(start_time > 1439 || start_time < 0){
