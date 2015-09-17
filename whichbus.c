@@ -14,25 +14,25 @@
 //  File data restraints
 #define  MAX_COLS_PER_LINE      	150
 #define  MAX_FIELDS_PER_LINE   		10
-#define  MAX_NAME_LEN     				50
-#define  MAX_STOPS         				20000
-#define  MAX_TRIPS        				40000
-#define  MAX_ROUTE_STOPS       	  200
-#define  MAX_ROUTE_ID      				4000
-#define  MAX_STOP_ID       				100000
-#define  MAX_TRIP_ID     	  			750000
+#define  MAX_NAME_LEN    		50
+#define  MAX_STOPS         		20000
+#define  MAX_TRIPS      		40000
+#define  MAX_ROUTE_STOPS       	  	200
+#define  MAX_ROUTE_ID      		4000
+#define  MAX_STOP_ID   			100000
+#define  MAX_TRIP_ID 	  		750000
 //	Arithmetic constants and problem definitions
-#define  PI                 		  (acos(-1.0))
-#define  MINS_IN_DAY      			  (24 * 60)
-#define  EARTH_RADIUS_M   				6372797
+#define  PI                 		(acos(-1.0))
+#define  MINS_IN_DAY      	        (24 * 60)
+#define  EARTH_RADIUS_M   	        6372797
 #define  WALK_SPEED       	     	60
-#define  MAX_WAIT_MINS     				60
-#define  MAX_WALKING_METRES 			1000
+#define  MAX_WAIT_MINS     		60
+#define  MAX_WALKING_METRES 	        1000
 //	File locations
-#define  STOPS 										"/stops.txt"
-#define  STOPTIMES 								"/stop_times.txt"
-#define  TRIPS 										"/trips.txt"
-#define  ROUTES 									"/routes.txt"
+#define  STOPS 				"/stops.txt"
+#define  STOPTIMES 			"/stop_times.txt"
+#define  TRIPS 				"/trips.txt"
+#define  ROUTES 	                "/routes.txt"
 
 
 //	Struct Definitions
