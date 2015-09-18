@@ -86,11 +86,11 @@ static double haversine(double lat1, double lon1, double lat2, double lon2){
 
 
 /* 
- * get_time
- * int
- * returns int representing minute of day based on external parameter
- * indicating 24 hour time format, extracted from a string.
- * Accounts for 24 hour time wrap around.
+ * 	get_time
+ * 	int
+ * 	returns int representing minute of day based on external parameter
+ * 	indicating 24 hour time format, extracted from a string.
+ * 	Accounts for 24 hour time wrap around.
  */
 static int get_time(char timeString[]){
 	int hours = (timeString[0] - '0')*10 + (timeString[1] - '0');
@@ -105,7 +105,7 @@ static int get_time(char timeString[]){
  *	Custom tokenizer function that can manage empty spaces
  *	between delimiters.
  *	Also allows delimiters to be ignored if they are within double
- *  quotes.
+ *      quotes.
  *	Outputs each successive token from string including
  *	empty positions when source is passed as NULL.
  */
@@ -223,11 +223,11 @@ static int *get_stop_arraysize(double origLat, double origLon, double destLat, d
 
 
 /*
- * populate_stop_arrays
- * void
- * Helper function for find_valid_stops
- * Populates the Origin and Destination Stop
- * Arrays with information from STOPS file
+ * 	populate_stop_arrays
+ * 	void
+ * 	Helper function for find_valid_stops
+ * 	Populates the Origin and Destination Stop
+ * 	Arrays with information from STOPS file
  *
  */
 static void populate_stop_arrays(Stop *originStopsArr, Stop *destStopsArr, 
