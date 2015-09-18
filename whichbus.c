@@ -682,20 +682,21 @@ int main(int argc, char *argv[]){
 			exit(EXIT_FAILURE);
 		}
 		char *env = getenv("LEAVEHOME");
-		//  Check if LEAVEHOME environment variable is set
+		// 	Check if LEAVEHOME environment variable is set
 		if (env == NULL){
-			fprintf(stderr,"%s Error: LEAVEHOME environment time not set!\n", argv[0]);
+			fprintf(stderr,"%s Error: LEAVEHOME environment variable not set!\n", argv[0]);
 			exit(EXIT_FAILURE);
 		}
-		//	Define global variable for FOLDER
-		FOLDER = argv[1];
-		//  Get current LEAVEHOME time in minutes
+		//  	Get current LEAVEHOME time in minutes
 		char cur_time[6];
 		int start_time = get_time(strncpy(cur_time, env+4, 5));
-		
-		int h, m;
-		int n = sscanf(env, "%d:%d", &h, &m);
-		printf("%d\n", n);
+		// 	 Check if LEAVEHOME time is valid
+		if (start_time > 1449 || start_time < 0){
+			fprintf(stderr,"%s Error: LEAVEHOME environment variable time invalid!\n", argv[0]);
+			exit(EXIT_FAILURE);			
+		} 
+		//	Define global variable for FOLDER
+		FOLDER = argv[1];
 	
 		find_valid_stops(origin_Lat, origin_Lon, dest_Lat, dest_Lon, start_time);
 		
