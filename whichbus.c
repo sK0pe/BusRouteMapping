@@ -1,14 +1,14 @@
 /*
 	CITS2002 Project 1 2015
-	Name(s):		Pradyumn Vij, Elijah Fetzer
+	Name(s):	Pradyumn Vij, Elijah Fetzer
 	Student number(s):	21469477, 21516694
-	Date:		17-09-2015
+	Date:	18-09-2015
 */
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <math.h>
-#include <time.h>
+#include <sys/param.h>
 #include <string.h>
 //	Arithmetic constants and problem definitions
 #define PI acos(-1.0)
@@ -92,17 +92,17 @@ static double haversine(double lat1, double lon1, double lat2, double lon2){
 static int get_time(char timeString[]){
 	int hours = (timeString[0] - '0')*10 + (timeString[1] - '0');
 	int minutes = (timeString[3] - '0')*10 + (timeString[4] - '0'); 
-	return hours * 60 + minutes;
+	return (hours * 60 + minutes) % 1440;
 }
 
 
 /*
  *	tokenizer
  *	*char
- *	Custom tokenizer function that can manage empty spaces
+ *	Custom string tokenizer function that can manage empty spaces
  *	between delimiters.
  *	Also allows delimiters to be ignored if they are within double
- * quotes.
+ *	quotes.
  *	Outputs each successive token from string including
  *	empty positions when source is passed as NULL.
  */
@@ -123,7 +123,7 @@ static char *tokenizer(char *source, const char *delimiter){
 	// from cursor's position, not including those between
 	// speechmarks, while moving cursor forward the token
 	// length
-	int n=0;
+	int n = 0;
 	bool quote = false;	
 	while(*cursor != '\0'){
 		if(*cursor == delimiter[0] && !quote){
@@ -135,8 +135,6 @@ static char *tokenizer(char *source, const char *delimiter){
 		n++;
 		cursor++;
 	}
-	//cursor += n;
-
 	// if cursor is not pointing to a nullbyte
 	// overwrite the delimiter with nullbyte and move forward
 	if(*cursor != '\0'){
@@ -148,17 +146,18 @@ static char *tokenizer(char *source, const char *delimiter){
 
  
 /*
- *	loadFile()
+ *	loadFile
  *	File *
  *	Takes NULL FILE * and char *
  *	To make a generic file loader with included error check
  */
 static FILE* loadFile(FILE *stream, char*fileToLoad){
-	char path[200];
+	char path[MAXPATHLEN];
 	strcpy(path, FOLDER);
 	strcat(path, fileToLoad);
 	stream = fopen(path, "r");
 	if(stream == NULL){
+		fprintf(stderr, "Error opening path: %s\n", path);
 		exit(EXIT_FAILURE);
 	}
 	return stream;
@@ -175,7 +174,7 @@ static FILE* loadFile(FILE *stream, char*fileToLoad){
 static int *get_stop_arraysize(double origLat, double origLon, double destLat, double destLon){
 	FILE *stopData = NULL;
 	stopData = loadFile(stopData,STOPS);
-	bool first = true;
+	bool first = true;	//	flat to skip first line
 	static int arraySizes[2];
 	int originStops = 0;	//	Number of stops close enough to origin
 	int destinationStops = 0;	// Number of stops close enough to destination
@@ -269,7 +268,7 @@ static void populate_stop_arrays(Stop *originStopsArr, Stop *destStopsArr,
 			//	field 6 has latitude
 			if(fieldNum == 6){
 				stop_lat = atof(field);
-				//	If ield 6 is known than 7 is also known (longitude)
+				//	If field 6 is known than 7 is also known (longitude)
 				stop_lon = atof(tokenizer(NULL, ","));
 				origin_stop_cost = haversine(origLat, origLon, stop_lat, stop_lon);
 				dest_stop_cost = haversine(stop_lat, stop_lon, destLat, destLon);
@@ -307,7 +306,7 @@ static void populate_stop_arrays(Stop *originStopsArr, Stop *destStopsArr,
 
 /*
  *	find_optimal_trip
- *	int *
+ *	void
  *	Helper function for find_valid_stops
  *	Opens and cycles through STOPTIMES looking for trips
  *	that will connect stops within originStopsArr and 
@@ -317,7 +316,7 @@ static void populate_stop_arrays(Stop *originStopsArr, Stop *destStopsArr,
  *	trip.
  *
  */
-static int *find_optimal_trip(Stop *originStopsArr, int originStopNumber, 
+static void find_optimal_trip(Stop *originStopsArr, int originStopNumber, 
 		Stop *destStopsArr, int destStopNumber, int currentTime, int *optimal_stops){
 	
 	FILE *stopTimeData = NULL;
@@ -434,7 +433,6 @@ static int *find_optimal_trip(Stop *originStopsArr, int originStopNumber,
 	if(stopTimeData != NULL){
 		fclose(stopTimeData);
 	}
-	return optimal_stops;
 }
 
 
@@ -463,8 +461,8 @@ static int get_route_id(int trip){
 			first = false;
 			continue;
 		}
-		fieldNum = 0;
-		field = tokenizer(line, ",");
+		fieldNum = 0;	//field or token counter
+		field = tokenizer(line, ",");	// pointer to receive otkens
 		//	Loop through tokens produced
 		while(field != NULL){
 			//	field 0 has route_id
@@ -561,7 +559,7 @@ static void get_route_name(int routeID, char* returnName){
 			skipLine = false;
 			continue;
 		}
-		//	Found route ID, don't need to go through any more lines
+		//	Found route ID, don't need to process more lines
 		if(found){
 			break;
 		}
