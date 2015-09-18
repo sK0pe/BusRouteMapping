@@ -663,7 +663,7 @@ int main(int argc, char *argv[]){
 	if (argc != 6){
 		fprintf(stderr,"%s Usage: <directory> <Origin Latitude>" 
 		 " <Origin Longitude> <Destination Latitude> <Destination Longitude>\n"
-		 "Coordinates must be entered as positive or negative numbers.\n",argv[0]);
+		 "Coordinates must be entered as positive or negative numbers.\n", argv[0]);
 		exit(EXIT_FAILURE);
 	}
 	else{
@@ -691,7 +691,7 @@ int main(int argc, char *argv[]){
 		char cur_time[6];
 		int start_time = get_time(strncpy(cur_time, env+4, 5));
 		// 	 Check if LEAVEHOME time is valid
-		if (start_time > 1449 || start_time < 0){
+		if (start_time > 1499 || start_time < 0){
 			fprintf(stderr,"%s Error: LEAVEHOME environment variable time invalid!\n", argv[0]);
 			exit(EXIT_FAILURE);			
 		} 
