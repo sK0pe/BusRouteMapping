@@ -2,27 +2,29 @@
 	CITS2002 Project 1 2015
 	Name(s):		Pradyumn Vij, Elijah Fetzer
 	Student number(s):	21469477, 21516694
-	Date:		17-09-2015
+	Date:		18-09-2015
 */
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include <math.h>
-#include <time.h>
 #include <string.h>
+#include <math.h>
+#include <sys/param.h>
+
 //	Arithmetic constants and problem definitions
-#define PI acos(-1.0)
-#define EARTH_RADIUS_M 6372797
-#define WALK_SPEED 60.0
-#define MAX_WAIT 60
-#define MAX_WALK 1000
+#define PI 			  acos(-1.0)
+#define EARTH_RADIUS_M 		  6372797
+#define WALK_SPEED 		  60.0
+#define MAX_WAIT_MINS 		  60
+#define MAX_WALK_METRES      	  1000
 //	File locations
-#define STOPS "/stops.txt"
-#define STOPTIMES "/stop_times.txt"
-#define TRIPS "/trips.txt"
-#define	ROUTES "/routes.txt"
-//	Global Variables
-char* FOLDER;
+#define STOPS 			  "/stops.txt"
+#define STOPTIMES 		  "/stop_times.txt"
+#define TRIPS 			  "/trips.txt"
+#define	ROUTES 			  "/routes.txt"
+
+//	Global Declarations
+char*   FOLDER;
 
 //	Struct Definitions
 
@@ -58,7 +60,7 @@ static bool valid_location(double latitude, double longitude){
  *
  */
 static double degrees_to_radians(double degrees){
-	return degrees*PI/180;
+	return degrees * PI/180;
 }
 
 
@@ -87,12 +89,13 @@ static double haversine(double lat1, double lon1, double lat2, double lon2){
  * get_time
  * int
  * returns int representing minute of day based on external parameter
- * indicating time 24 hour format, extracted from a string.
+ * indicating 24 hour time format, extracted from a string.
+ * Accounts for 24 hour time wrap around.
  */
-int get_time(char timeString[]){
+static int get_time(char timeString[]){
 	int hours = (timeString[0] - '0')*10 + (timeString[1] - '0');
 	int minutes = (timeString[3] - '0')*10 + (timeString[4] - '0'); 
-	return hours * 60 + minutes;
+	return (hours * 60 + minutes) % 1440;
 }
 
 
@@ -102,11 +105,11 @@ int get_time(char timeString[]){
  *	Custom tokenizer function that can manage empty spaces
  *	between delimiters.
  *	Also allows delimiters to be ignored if they are within double
- * quotes.
+ *  quotes.
  *	Outputs each successive token from string including
  *	empty positions when source is passed as NULL.
  */
-char *tokenizer(char *source, const char *delimiter){
+static char *tokenizer(char *source, const char *delimiter){
 	static char *cursor = NULL;
 	char *tokenStart;
 	//	First time, point to start of source
@@ -123,7 +126,7 @@ char *tokenizer(char *source, const char *delimiter){
 	// from cursor's position, not including those between
 	// speechmarks, while moving cursor forward the token
 	// length
-	int n=0;
+	int n = 0;
 	bool quote = false;	
 	while(*cursor != '\0'){
 		if(*cursor == delimiter[0] && !quote){
@@ -131,12 +134,10 @@ char *tokenizer(char *source, const char *delimiter){
 		}
 		if(*cursor == '"'){
 			quote = !quote;
-		}		
+		}	
 		n++;
 		cursor++;
 	}
-	//cursor += n;
-
 	// if cursor is not pointing to a nullbyte
 	// overwrite the delimiter with nullbyte and move forward
 	if(*cursor != '\0'){
@@ -148,13 +149,13 @@ char *tokenizer(char *source, const char *delimiter){
 
  
 /*
- *	loadFile()
+ *	load_file
  *	File *
  *	Takes NULL FILE * and char *
  *	To make a generic file loader with included error check
  */
-FILE* loadFile(FILE *stream, char*fileToLoad){
-	char path[200];
+static FILE* load_file(FILE *stream, char*fileToLoad){
+	char path[MAXPATHLEN];
 	strcpy(path, FOLDER);
 	strcat(path, fileToLoad);
 	stream = fopen(path, "r");
@@ -170,12 +171,11 @@ FILE* loadFile(FILE *stream, char*fileToLoad){
  *	int *
  *	Returns a pointer to integer array indicating the number of 
  *	valid stops for origin and destination.
- *
  */
-int *get_stop_arraysize(double origLat, double origLon, double destLat, double destLon){
+static int *get_stop_arraysize(double origLat, double origLon, double destLat, double destLon){
 	FILE *stopData = NULL;
-	stopData = loadFile(stopData,STOPS);
-	bool first = true;
+	stopData = load_file(stopData,STOPS);
+	bool first = true; // flag to skip first line
 	static int arraySizes[2];
 	int originStops = 0;	//	Number of stops close enough to origin
 	int destinationStops = 0;	// Number of stops close enough to destination
@@ -204,11 +204,11 @@ int *get_stop_arraysize(double origLat, double origLon, double destLat, double d
 			fieldNum++;
 			field = tokenizer(NULL, ",");
 		}
-		// If close enough to origin, add 1
-		if(haversine(origLat, origLon, stop_lat, stop_lon) <= MAX_WALK){
+		// If close enough to origin, increment number of stops
+		if(haversine(origLat, origLon, stop_lat, stop_lon) <= MAX_WALK_METRES){
 			originStops++;
 		}
-		if(haversine(destLat, destLon, stop_lat, stop_lon) <= MAX_WALK){
+		if(haversine(destLat, destLon, stop_lat, stop_lon) <= MAX_WALK_METRES){
 			destinationStops++;
 		}
 	}
@@ -230,12 +230,12 @@ int *get_stop_arraysize(double origLat, double origLon, double destLat, double d
  * Arrays with information from STOPS file
  *
  */
-void populate_stop_arrays(Stop *originStopsArr, Stop *destStopsArr, 
+static void populate_stop_arrays(Stop *originStopsArr, Stop *destStopsArr, 
 		double origLat, double origLon, double destLat, double destLon){
 	
 	FILE *stopData = NULL;
-	stopData = loadFile(stopData,STOPS);
-	bool first = true;	//	Boolean to skip first line
+	stopData = load_file(stopData,STOPS);
+	bool first = true;	//	flag to skip first line
 	char line[BUFSIZ];	//	Line buffer
 	int stop_id;
 	char *stop_name;
@@ -247,6 +247,7 @@ void populate_stop_arrays(Stop *originStopsArr, Stop *destStopsArr,
 	int dest_stop_counter = 0;
 	int fieldNum;	//	field or token counter
 	char *field;	//	pointer to recieve tokens
+	
 	//	Read through text file looking for valid stops
 	while(fgets(line, sizeof line, stopData) != NULL){
 		//	Skip first line
@@ -269,28 +270,28 @@ void populate_stop_arrays(Stop *originStopsArr, Stop *destStopsArr,
 			//	field 6 has latitude
 			if(fieldNum == 6){
 				stop_lat = atof(field);
-				//	If ield 6 is known than 7 is also known (longitude)
+				//	If field 6 is known then 7 is also known (longitude)
 				stop_lon = atof(tokenizer(NULL, ","));
 				origin_stop_cost = haversine(origLat, origLon, stop_lat, stop_lon);
-				dest_stop_cost = haversine(destLat, destLon, stop_lat, stop_lon);
-				if((origin_stop_cost <= MAX_WALK) && (origin_stop_cost < dest_stop_cost)){
+				dest_stop_cost = haversine(stop_lat, stop_lon, destLat, destLon);
+				if((origin_stop_cost <= MAX_WALK_METRES) && (origin_stop_cost < dest_stop_cost)){
 					//	Enter id
 					originStopsArr[origin_stop_counter].id = stop_id;
 					//	Enter name of stop
 					strcpy(originStopsArr[origin_stop_counter].name, stop_name);
 					//	Enter time cost
 					originStopsArr[origin_stop_counter].distance = origin_stop_cost;
-					++origin_stop_counter;
+					origin_stop_counter++;
 					break;
 				}
-				if((dest_stop_cost <= MAX_WALK) && (dest_stop_cost < origin_stop_cost)){
+				if((dest_stop_cost <= MAX_WALK_METRES) && (dest_stop_cost < origin_stop_cost)){
 					//	Enter id
 					destStopsArr[dest_stop_counter].id = stop_id;
-					//	Enter / copy over name
+					//	Enter name of stop
 					strcpy(destStopsArr[dest_stop_counter].name, stop_name);
 					//	Enter time cost
 					destStopsArr[dest_stop_counter].distance = dest_stop_cost;
-					++dest_stop_counter;
+					dest_stop_counter++;
 					break;
 				}
 			}
@@ -307,7 +308,7 @@ void populate_stop_arrays(Stop *originStopsArr, Stop *destStopsArr,
 
 /*
  *	find_optimal_trip
- *	int *
+ *	void
  *	Helper function for find_valid_stops
  *	Opens and cycles through STOPTIMES looking for trips
  *	that will connect stops within originStopsArr and 
@@ -315,15 +316,14 @@ void populate_stop_arrays(Stop *originStopsArr, Stop *destStopsArr,
  *	the destination.
  *	Returns the array indicies and values regarding the optimal
  *	trip.
- *
  */
-int *find_optimal_trip(Stop *originStopsArr, int originStopNumber, 
+static void find_optimal_trip(Stop *originStopsArr, int originStopNumber, 
 		Stop *destStopsArr, int destStopNumber, int currentTime, int *optimal_stops){
 	
 	FILE *stopTimeData = NULL;
 	//	Open STOPTIMES file
-	stopTimeData = loadFile(stopTimeData, STOPTIMES);
-	bool first = true;	//	boolean to skip first line
+	stopTimeData = load_file(stopTimeData, STOPTIMES);
+	bool first = true;	//	flag to skip first line
 	char line[BUFSIZ];	//	buffer for line
 	//	current value variables
 	int trip_id;
@@ -337,8 +337,8 @@ int *find_optimal_trip(Stop *originStopsArr, int originStopNumber,
 	int validDepartureTime;
 	int validTrip_id;
 	int validIndex;
-	//	Boolean marker to check whether to skip processing of line due
-	//	to logically invalid possibilities
+	//	Boolean marker to check whether to skip processing of line due to
+	//	logically invalid possibilities
 	bool skipLine = false;
 	//	Loop Variables
 	int fieldNum;
@@ -373,7 +373,7 @@ int *find_optimal_trip(Stop *originStopsArr, int originStopNumber,
 			if(fieldNum == 2){
 				departureTime = get_time(field);
 				//	departures can't be more than an hour after leaving home
-				if(departureTime < currentTime || departureTime > currentTime + MAX_WAIT){
+				if(!validDepartureFound && (departureTime < currentTime || departureTime > currentTime + MAX_WAIT_MINS)){
 					skipLine = true;
 					break;
 				}
@@ -390,16 +390,14 @@ int *find_optimal_trip(Stop *originStopsArr, int originStopNumber,
 			skipLine = false;
 			continue;
 		}
+		
 		//	Checking for valid link between stops
 		//	validTrip_id may be a double check from field 0 check above
 		if(validDepartureFound && arrivalTime > validDepartureTime){
 			for(int j = 0; j < destStopNumber; j++){
 			//	if valid origin to destination link found 
 				if(stop_id == destStopsArr[j].id){
-					//	The total cost of walking to the stop + wait + travel time + walking to destination is the following expression 
-					//	validWalkTime1 + (validDepartureTime - validWalkTime1) + arrivalTime - validDepartureTime + (int)ceil(destStopsArr[j].distance/WALK_SPEED);
-					//	However this can be simplified to arrival time + time to walk to destination
-					int validTime = arrivalTime + (int)ceil(destStopsArr[j].distance/WALK_SPEED);
+					int validTime = arrivalTime + (int)ceil(destStopsArr[j].distance / WALK_SPEED);
 					//	Check for less than 0 min_timeCost meaning no links are yet found
 					if(min_timeCost > validTime || min_timeCost < 0){
 							min_timeCost = validTime;
@@ -413,13 +411,13 @@ int *find_optimal_trip(Stop *originStopsArr, int originStopNumber,
 				}
 			}
 		}
-		
+
 		//	Check for valid origin
 		for(int i = 0; i < originStopNumber; i++){
 			//	Check if stop is a valid origin
 			if(stop_id == originStopsArr[i].id){
 				//	Check if valid departure (i.e. walk to stop in time)
-				int origin_timecost = (int)ceil(originStopsArr[i].distance/WALK_SPEED);
+				int origin_timecost = (int)(originStopsArr[i].distance/WALK_SPEED);
 				if(currentTime + origin_timecost < departureTime){
 					validDepartureFound = true;
 					//	If true, record departure details
@@ -433,7 +431,6 @@ int *find_optimal_trip(Stop *originStopsArr, int originStopNumber,
 	if(stopTimeData != NULL){
 		fclose(stopTimeData);
 	}
-	return optimal_stops;
 }
 
 
@@ -441,15 +438,14 @@ int *find_optimal_trip(Stop *originStopsArr, int originStopNumber,
  *	get_route_id
  *	int
  *	Takes trip_id as input, matches it in 
- *	TRIPS file to find route_id and
+ *	TRIPS file to its corresponding route_id and
  *	returns it as an integer.
- *
  */
-int get_route_id(int trip){
+static int get_route_id(int trip){
 	//	Open and search TRIPS file
 	FILE *tripData = NULL;
-	tripData = loadFile(tripData, TRIPS);
-	bool first = true;	//	boolean to skip first line
+	tripData = load_file(tripData, TRIPS);
+	bool first = true;	//	flag to skip first line
 	char line[BUFSIZ];	//	character array for line read buffer
 	int routeID;
 	bool tripFound = false;
@@ -497,21 +493,21 @@ int get_route_id(int trip){
  *	void
  *	Populates a character array with the route name of
  *	the route_id provided, reading the ROUTES file.
- *
  */
-void get_route_name(int routeID, char* returnName){
+static void get_route_name(int routeID, char* returnName){
 	// Open and search ROUTES file
 	FILE *routeData = NULL;
-	routeData = loadFile(routeData, ROUTES);
+	routeData = load_file(routeData, ROUTES);
 	char line[BUFSIZ];	//	line read in buffer
-	bool first = true;	//	skip first line
+	bool first = true;	//	flag to skip first line
 	int transportType;
 	char shortName[4];
-	char longName[30];
+	char longName[40];
 	bool skipLine = false;
 	bool found = false;
 	int fieldNum;
 	char *field;
+	
 	while(fgets(line, sizeof line, routeData) != NULL){
 		//	Skip First Line
 		if(first){
@@ -539,13 +535,16 @@ void get_route_name(int routeID, char* returnName){
 			}
 			//	field 3 has route_long_name
 			if(fieldNum == 3){
-				if (strlen(field)){
+				if (strlen(field) > 0){
 					strcpy(longName, "\"");
 					strcat(longName, field);
 					strcat(longName, "\"");
 				}
+				else{
+					strcpy(longName, field);
+				}
 			}
-			//	field 5 defines tranpsort type
+			//	field 5 has transport type
 			if(fieldNum == 5){
 				transportType = atoi(field);
 			}
@@ -557,7 +556,7 @@ void get_route_name(int routeID, char* returnName){
 			skipLine = false;
 			continue;
 		}
-		//	Found route ID, don't need to go through any more lines
+		//	Found route ID, don't need to process any more lines
 		if(found){
 			break;
 		}
@@ -566,86 +565,91 @@ void get_route_name(int routeID, char* returnName){
 	if(routeData != NULL){
 		fclose(routeData);
 	}
-	//	Construt route name description
-	switch(transportType){
-		case 2 :
-			strcpy(returnName, "rail  ");
-			strcat(returnName, longName);
-			break;
-		case 3 :
-			strcpy(returnName, "bus  ");
-			strcat(returnName, shortName);
-			strcat(returnName, longName);
-			break;
-		case 4 :
-			strcpy(returnName, "ferry  ");
-			strcat(returnName, longName);
+	//	Construct route name description
+	if (transportType == 2){
+		strcpy(returnName, "rail  ");
+	}
+	else if (transportType == 3){
+		strcpy(returnName, "bus  ");
+		strcat(returnName, shortName);
+	} 
+	else if (transportType == 4){
+		strcpy(returnName, "ferry  ");
+	}
+	strcat(returnName, longName);
+}
+
+
+/*
+ *	print_results
+ *	void
+ *	Prints to standard output the shortest found single segment journey
+ */
+void 	print_results(Stop *originStopsArr, Stop *destStopsArr, int *min_trip, double origLat,
+              double origLon, double destLat, double destLon, int currentTime){
+
+	int min_OriginIndex = min_trip[0];
+	int min_DestIndex = min_trip[1];
+	//	Get route ID
+	int route_id = get_route_id(min_trip[4]);
+	//  Get route name
+	char route_name[30];
+	get_route_name(route_id, route_name);
+
+	//  Arrival Time
+	int arrival = min_trip[3] + (int)ceil(destStopsArr[min_DestIndex].distance/WALK_SPEED);
+	//  Calculate walking time and distance to see if walking is faster than taking a trip
+	double walking_distance = haversine(origLat, origLon, destLat, destLon);
+	int walking_time = (int)ceil(walking_distance/WALK_SPEED);
+	int walk_arrival = currentTime + walking_time;
+	
+	// Print the results
+	if(min_trip[0] == -1){
+		// If no appropriate journey found
+		printf("%02d:%02d  not  possible\n", currentTime/60, currentTime%60);
+	}
+	else if(walking_distance < MAX_WALK_METRES && walk_arrival < arrival){
+		// If walking is faster than taking public transport
+		printf("%02d:%02d  walk  %dm  to  destination\n", currentTime/60, currentTime%60, (int)walking_distance);
+		printf("%02d:%02d  arrive\n", walk_arrival/60, walk_arrival%60);
+	}
+	else{
+		// If taking public transport
+		printf("%02d:%02d  walk  %dm  to  stop  %d  %s\n", currentTime/60, currentTime%60, (int)originStopsArr[min_OriginIndex].distance, 
+							originStopsArr[min_OriginIndex].id,	originStopsArr[min_OriginIndex].name);
+		printf("%02d:%02d  catch  %s  to  stop  %d  %s\n", min_trip[2]/60, min_trip[2]%60, route_name, destStopsArr[min_DestIndex].id,
+		        destStopsArr[min_DestIndex].name);
+		printf("%02d:%02d  walk  %dm  to  destination\n", min_trip[3]/60, min_trip[3]%60, (int)destStopsArr[min_DestIndex].distance);
+		printf("%02d:%02d  arrive\n", arrival/60, arrival%60);
 	}
 }
 
 
 /*
  *	find_valid_stops
- *
+ *	void
  *	Fills origin and destination arrays of type Stop with STOP file
  *	information.
  */
- void find_valid_stops(double origLat, double origLon, double destLat, double destLon, int currentTime){
+static void find_valid_stops(double origLat, double origLon, double destLat, double destLon, int currentTime){
 	//	Find number of valid stops at origin and destination
 	int *size = get_stop_arraysize(origLat, origLon, destLat, destLon);
 	int originStopNumber = size[0];
 	int destStopNumber = size[1];
-	//	Make array of stops of appropriate size
-	Stop originStopsArr[ originStopNumber ];
+	//	Build array of stops of appropriate size
+	Stop originStopsArr[ originStopNumber];
 	Stop destStopsArr[ destStopNumber ];
 	//	Populate Stop Arrays
 	populate_stop_arrays(originStopsArr, destStopsArr, origLat, origLon, destLat, destLon);
 	//	Find Optimal Trip
 	int min_trip[5];
-	//	Fill array with -1 originally so impossible solutions can be found
+	//	Initialize array with -1 values so impossible solutions can be found
 	for(int i = 0; i < 5; ++i){
 		min_trip[i] = -1;
 	}
-	
-	find_optimal_trip(originStopsArr,originStopNumber, destStopsArr, destStopNumber, currentTime, min_trip);
-	
-	int min_OriginIndex = min_trip[0];
-	int min_DestIndex = min_trip[1];
-	//	Get route ID
-	int route_id = get_route_id(min_trip[4]);
-	// Get route name
-	char route_name[50]; 
-	get_route_name(route_id, route_name);
-	// Arrival Times
-	int arrival = min_trip[3] + (int)ceil(destStopsArr[min_DestIndex].distance/WALK_SPEED);
-	// Calculate walking time and distance to see if walking is faster than taking a trip
-	double walking_distance = haversine(origLat, origLon, destLat, destLon);
-	int walking_time = (int)ceil(walking_distance/WALK_SPEED);
-	int walk_arrival = currentTime + walking_time;
-	
-	if(min_trip[0] == -1){
-		//	If no appropriate journey found
-		printf("%02d:%02d  not  possible\n", currentTime/60, currentTime%60);
-	}
-	else if(walking_distance < MAX_WALK && walk_arrival < arrival){
-		// If walking is faster than taking public transport
-		printf("%02d:%02d  walk  %dm  to  destination\n%02d:%02d  arrive\n", currentTime/60, currentTime%60, (int)walking_distance, walk_arrival/60, walk_arrival%60);
-	}
-	else{
-		// If taking public transport
-		printf("%02d:%02d  walk  %dm  to  stop  %d  %s\n%02d:%02d  catch  %s  to  stop  %d  %s\n%02d:%02d  walk  %dm  to  destination\n%02d:%02d  arrive\n",
-				currentTime/60, currentTime%60,
-					(int)originStopsArr[min_OriginIndex].distance,
-						originStopsArr[min_OriginIndex].id,
-							originStopsArr[min_OriginIndex].name,
-								min_trip[2]/60, min_trip[2]%60,
-									route_name,
-										destStopsArr[min_DestIndex].id,
-											destStopsArr[min_DestIndex].name,
-												min_trip[3]/60, min_trip[3]%60,
-													(int)destStopsArr[min_DestIndex].distance,
-														arrival/60, arrival%60);
-	}	
+	find_optimal_trip(originStopsArr, originStopNumber, destStopsArr, destStopNumber, currentTime, min_trip);
+	//  Print the results
+	print_results(originStopsArr, destStopsArr, min_trip, origLat, origLon, destLat, destLon, currentTime);
 }
 
 
@@ -654,11 +658,10 @@ void get_route_name(int routeID, char* returnName){
  *	Input argument validity and passing variables as required
  */
 int main(int argc, char *argv[]){
-
 	if (argc != 6){
-		fprintf(stderr,"%s Usage: <directory> <Origin Latitude> <Origin Longitude>\n\
-		<Destination Latitude> <Destination Longitude>\n\
-		Coordinates must be entered as positive or negative numbers.\n",argv[0]);
+		fprintf(stderr,"%s Usage: <directory> <Origin Latitude>" 
+		 " <Origin Longitude> <Destination Latitude> <Destination Longitude>\n"
+		 "Coordinates must be entered as positive or negative numbers.\n",argv[0]);
 		exit(EXIT_FAILURE);
 	}
 	else{
@@ -676,15 +679,18 @@ int main(int argc, char *argv[]){
 			fprintf(stderr,"%s Error: Destination Coordinates invalid!\n", argv[0]);
 			exit(EXIT_FAILURE);
 		}
+		char *env = getenv("LEAVEHOME");
+		//  Check if LEAVEHOME environment variable is set
+		if (env == NULL){
+			fprintf(stderr,"%s Error: LEAVEHOME environment time not set!\n", argv[0]);
+			exit(EXIT_FAILURE);
+		}
 		//	Define global variable for FOLDER
 		FOLDER = argv[1];
-		// Source time from environmental variable LEAVEHOME
+		//  Get current LEAVEHOME time in minutes
 		char cur_time[6];
-		int start_time = get_time(strncpy(cur_time, getenv("LEAVEHOME")+4, 5));
-		if(start_time > 1439 || start_time < 0){
-			fprintf(stderr,"%s Error: Time is invalid!\n", argv[0]);
-		}
-		
+		int start_time = get_time(strncpy(cur_time, env+4, 5));
+				
 		find_valid_stops(origin_Lat, origin_Lon, dest_Lat, dest_Lon, start_time);
 		
 		exit(EXIT_SUCCESS);
