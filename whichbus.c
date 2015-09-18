@@ -95,14 +95,14 @@ static double haversine(double lat1, double lon1, double lat2, double lon2){
 static int get_time(char timeString[]){
 	int hours = (timeString[0] - '0')*10 + (timeString[1] - '0');
 	int minutes = (timeString[3] - '0')*10 + (timeString[4] - '0'); 
-	return (hours * 60 + minutes) % 1440;
+	return (hours * 60 + minutes) % 1441;
 }
 
 
 /*
  *	tokenizer
  *	*char
- *	Custom tokenizer function that can manage empty spaces
+ *	Custom string tokenizer function that can manage empty spaces
  *	between delimiters.
  *	Also allows delimiters to be ignored if they are within double
  *      quotes.
@@ -127,7 +127,7 @@ static char *tokenizer(char *source, const char *delimiter){
 	// speechmarks, while moving cursor forward the token
 	// length
 	int n = 0;
-	bool quote = false;	
+	bool quote = false;
 	while(*cursor != '\0'){
 		if(*cursor == delimiter[0] && !quote){
 			break;
@@ -152,7 +152,7 @@ static char *tokenizer(char *source, const char *delimiter){
  *	load_file
  *	File *
  *	Takes NULL FILE * and char *
- *	To make a generic file loader with included error check
+ *	To make a generic file loader with included error check.
  */
 static FILE* load_file(FILE *stream, char*fileToLoad){
 	char path[MAXPATHLEN];
@@ -160,6 +160,7 @@ static FILE* load_file(FILE *stream, char*fileToLoad){
 	strcat(path, fileToLoad);
 	stream = fopen(path, "r");
 	if(stream == NULL){
+		fprintf(stderr, "error opening file: %s", path);
 		exit(EXIT_FAILURE);
 	}
 	return stream;
@@ -170,18 +171,19 @@ static FILE* load_file(FILE *stream, char*fileToLoad){
  *	get_stop_arraysize
  *	int *
  *	Returns a pointer to integer array indicating the number of 
- *	valid stops for origin and destination.
+ *	valid stops within walking distance for origin and destination.
  */
 static int *get_stop_arraysize(double origLat, double origLon, double destLat, double destLon){
 	FILE *stopData = NULL;
 	stopData = load_file(stopData,STOPS);
-	bool first = true; // flag to skip first line
+	char line[BUFSIZ];	     //	current line buffer
+	bool first = true; 	     // flag to skip first line
 	static int arraySizes[2];
-	int originStops = 0;	//	Number of stops close enough to origin
-	int destinationStops = 0;	// Number of stops close enough to destination
-	char line[BUFSIZ];	//	Line buffer
+	int originStops = 0;	     // number of stops close enough to origin
+	int destinationStops = 0;    // number of stops close enough to destination
 	double stop_lat;
 	double stop_lon;
+
 	//	Read through text file looking for valid stops
 	while(fgets(line, sizeof line, stopData) != NULL){
 		//	Skip first line
@@ -192,7 +194,7 @@ static int *get_stop_arraysize(double origLat, double origLon, double destLat, d
 		
 		int fieldNum = 0;
 		//	find stop coordinates
-		char *field = tokenizer(line,",");
+		char *field = tokenizer(line, ",");
 		while(field != NULL){
 			//	field 6 has latitude
 			if(fieldNum == 6 ){
@@ -228,15 +230,14 @@ static int *get_stop_arraysize(double origLat, double origLon, double destLat, d
  * 	Helper function for find_valid_stops
  * 	Populates the Origin and Destination Stop
  * 	Arrays with information from STOPS file
- *
  */
 static void populate_stop_arrays(Stop *originStopsArr, Stop *destStopsArr, 
 		double origLat, double origLon, double destLat, double destLon){
 	
 	FILE *stopData = NULL;
 	stopData = load_file(stopData,STOPS);
+	char line[BUFSIZ];	//	current line buffer
 	bool first = true;	//	flag to skip first line
-	char line[BUFSIZ];	//	Line buffer
 	int stop_id;
 	char *stop_name;
 	double origin_stop_cost;
@@ -245,8 +246,8 @@ static void populate_stop_arrays(Stop *originStopsArr, Stop *destStopsArr,
 	double stop_lon;
 	int origin_stop_counter = 0;
 	int dest_stop_counter = 0;
-	int fieldNum;	//	field or token counter
-	char *field;	//	pointer to recieve tokens
+	int fieldNum;		//	field or token counter
+	char *field;		//	pointer to recieve tokens
 	
 	//	Read through text file looking for valid stops
 	while(fgets(line, sizeof line, stopData) != NULL){
@@ -321,10 +322,9 @@ static void find_optimal_trip(Stop *originStopsArr, int originStopNumber,
 		Stop *destStopsArr, int destStopNumber, int currentTime, int *optimal_stops){
 	
 	FILE *stopTimeData = NULL;
-	//	Open STOPTIMES file
 	stopTimeData = load_file(stopTimeData, STOPTIMES);
+	char line[BUFSIZ];	//	current line buffer
 	bool first = true;	//	flag to skip first line
-	char line[BUFSIZ];	//	buffer for line
 	//	current value variables
 	int trip_id;
 	int arrivalTime;
@@ -341,8 +341,9 @@ static void find_optimal_trip(Stop *originStopsArr, int originStopNumber,
 	//	logically invalid possibilities
 	bool skipLine = false;
 	//	Loop Variables
-	int fieldNum;
-	char *field;
+	int fieldNum;		//	field or token counter
+	char *field;		//	pointer to recieve tokens
+
 	while(fgets(line, sizeof line, stopTimeData) != NULL){
 		//	Skip first line
 		if(first){
@@ -445,13 +446,14 @@ static int get_route_id(int trip){
 	//	Open and search TRIPS file
 	FILE *tripData = NULL;
 	tripData = load_file(tripData, TRIPS);
+	char line[BUFSIZ];	//	current line buffer
 	bool first = true;	//	flag to skip first line
-	char line[BUFSIZ];	//	character array for line read buffer
 	int routeID;
 	bool tripFound = false;
 	//	Loop through text file
-	int fieldNum;
-	char *field;
+	int fieldNum; 		//	field or token counter
+	char *field;		//	pointer to recieve tokens
+
 	while(fgets(line, sizeof line, tripData) != NULL){
 		//	Skip First Line
 		if(first){
@@ -498,15 +500,15 @@ static void get_route_name(int routeID, char* returnName){
 	// Open and search ROUTES file
 	FILE *routeData = NULL;
 	routeData = load_file(routeData, ROUTES);
-	char line[BUFSIZ];	//	line read in buffer
+	char line[BUFSIZ];	//	current line buffer
 	bool first = true;	//	flag to skip first line
 	int transportType;
 	char shortName[4];
 	char longName[40];
 	bool skipLine = false;
 	bool found = false;
-	int fieldNum;
-	char *field;
+	int fieldNum;		//	field or token counter
+	char *field;		//	pointer to recieve tokens
 	
 	while(fgets(line, sizeof line, routeData) != NULL){
 		//	Skip First Line
@@ -585,14 +587,14 @@ static void get_route_name(int routeID, char* returnName){
  *	void
  *	Prints to standard output the shortest found single segment journey
  */
-void 	print_results(Stop *originStopsArr, Stop *destStopsArr, int *min_trip, double origLat,
+void print_results(Stop *originStopsArr, Stop *destStopsArr, int *min_trip, double origLat,
               double origLon, double destLat, double destLon, int currentTime){
 
 	int min_OriginIndex = min_trip[0];
 	int min_DestIndex = min_trip[1];
 	//	Get route ID
 	int route_id = get_route_id(min_trip[4]);
-	//  Get route name
+	// 	Get route name
 	char route_name[30];
 	get_route_name(route_id, route_name);
 
@@ -648,7 +650,7 @@ static void find_valid_stops(double origLat, double origLon, double destLat, dou
 		min_trip[i] = -1;
 	}
 	find_optimal_trip(originStopsArr, originStopNumber, destStopsArr, destStopNumber, currentTime, min_trip);
-	//  Print the results
+
 	print_results(originStopsArr, destStopsArr, min_trip, origLat, origLon, destLat, destLon, currentTime);
 }
 
@@ -690,7 +692,11 @@ int main(int argc, char *argv[]){
 		//  Get current LEAVEHOME time in minutes
 		char cur_time[6];
 		int start_time = get_time(strncpy(cur_time, env+4, 5));
-				
+		
+		int h, m;
+		int n = sscanf(env, "%d:%d", &h, &m);
+		printf("%d\n", n);
+	
 		find_valid_stops(origin_Lat, origin_Lon, dest_Lat, dest_Lon, start_time);
 		
 		exit(EXIT_SUCCESS);
