@@ -1,4 +1,4 @@
-# CITS2002-Project1
+# Public Transport route finder
 Full Instructions at http://teaching.csse.uwa.edu.au/units/CITS2002/projects/project1.php
 Perth's Public Transport Authority (PTA) provides public access to its scheduled times, stop locations, and route information from its webpage www.transperth.wa.gov.au/About/Spatial-Data-Access. The data is released as a collection of inter-related textfiles following the Google Transit Feed Specification (GTFS), which is also used by many other public transport companies, worldwide.
 You will need to download your own copy of the data (about 90MB) by clicking on the first link "By downloading the data you are agreeing to the terms of the License..." 
